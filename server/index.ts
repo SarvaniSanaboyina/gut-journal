@@ -8,19 +8,21 @@ const HOST = process.env.HOST ?? '127.0.0.1'
 const DATA_DIR = resolve(process.env.JOURNAL_DATA ?? 'data/pglite')
 const DIST_DIR = resolve(process.env.JOURNAL_STATIC ?? 'dist')
 
-mkdirSync(DATA_DIR, { recursive: true })
-const { prisma, pglite } = await openDatabase(DATA_DIR)
+if (!process.env.DATABASE_URL) mkdirSync(DATA_DIR, { recursive: true })
+const { prisma, kind, close } = await openDatabase(DATA_DIR)
 const app = createApp(prisma, { distDir: DIST_DIR })
 
 const server = app.listen(PORT, HOST, () => {
-  console.log(`PGlite database: ${DATA_DIR}`)
+  console.log(`Database: ${kind}`)
   console.log(`Prisma + Express API: http://${HOST}:${PORT}`)
 })
 
 async function shutdown() {
-  server.close()
+  await new Promise<void>((resolve, reject) => {
+    server.close(error => error ? reject(error) : resolve())
+  })
   await prisma.$disconnect()
-  await pglite.close()
+  await close()
   process.exit(0)
 }
 

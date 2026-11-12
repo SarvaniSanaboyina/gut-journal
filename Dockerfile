@@ -1,4 +1,4 @@
-# Express + Prisma + PGlite API
+# Website and Express API
 FROM node:22-bookworm-slim AS build
 
 RUN corepack enable && corepack prepare pnpm@10.20.0 --activate
@@ -10,11 +10,14 @@ COPY prisma ./prisma
 
 RUN pnpm install --frozen-lockfile
 
-COPY server ./server
+COPY . .
+RUN pnpm build
 
 FROM node:22-bookworm-slim
 
-RUN corepack enable && corepack prepare pnpm@10.20.0 --activate \
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends curl \
+  && rm -rf /var/lib/apt/lists/* \
   && groupadd --system journal \
   && useradd --system --gid journal --home-dir /app --shell /usr/sbin/nologin journal \
   && mkdir -p /data/pglite \
@@ -31,6 +34,8 @@ ENV NODE_ENV=production \
 
 USER journal
 EXPOSE 8787
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:8787/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 VOLUME ["/data/pglite"]
 
-CMD ["pnpm", "start"]
+CMD ["node", "--import", "tsx", "server/index.ts"]

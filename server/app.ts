@@ -44,9 +44,10 @@ export function createApp(prisma: PrismaClient, options: { distDir?: string } = 
   const app = express()
   app.disable('x-powered-by')
 
-  app.get('/api/health', (_req, res) => {
+  app.get('/api/health', async (_req, res) => {
     res.set('cache-control', 'no-store')
-    res.json({ ok: true, database: 'pglite', orm: 'prisma' })
+    await prisma.$queryRaw`SELECT 1`
+    res.json({ ok: true, orm: 'prisma' })
   })
 
   app.get('/api/photos/:mealId/:slot', async (req, res) => {
