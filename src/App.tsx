@@ -47,7 +47,10 @@ export default function App() {
           </div>
           <div>
             <h1>{APP_NAME}</h1>
-            <p>Meals, poops, and mood — saved in a local PGlite database</p>
+            <p>
+              <span className="tagline-long">Meals, poops, and mood — saved in a local PGlite database</span>
+              <span className="tagline-short">Meals, poops, and mood</span>
+            </p>
           </div>
         </div>
       </header>
@@ -78,7 +81,7 @@ export default function App() {
           <button className="icon-btn" onClick={() => setDate(shiftDate(date, -1))} aria-label="Previous day">
             <Chevron dir="left" />
           </button>
-          <div>
+          <div className="date-nav-copy">
             <h2>{title}</h2>
             <div className="sub">
               {isToday(date) ? formatLongDate(date) : 'Tap an entry to edit it'}

@@ -13,8 +13,12 @@ export function Modal({
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
     }
+    document.body.classList.add('sheet-open')
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      document.body.classList.remove('sheet-open')
+      window.removeEventListener('keydown', onKey)
+    }
   }, [onClose])
 
   return (
