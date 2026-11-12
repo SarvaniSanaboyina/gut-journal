@@ -68,6 +68,35 @@ export function weekDates(endISO: string): string[] {
   return Array.from({ length: 7 }, (_, i) => shiftDate(endISO, i - 6))
 }
 
+export function weekdayLabels(): string[] {
+  return Array.from({ length: 7 }, (_, index) =>
+    new Date(2026, 1, index + 1).toLocaleDateString(undefined, { weekday: 'short' }),
+  )
+}
+
+export function formatMonthYear(year: number, month: number): string {
+  return new Date(year, month, 1).toLocaleDateString(undefined, {
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
+export function shiftMonth(year: number, month: number, delta: number) {
+  const date = new Date(year, month + delta, 1)
+  return { year: date.getFullYear(), month: date.getMonth() }
+}
+
+export function monthCells(year: number, month: number): (string | null)[] {
+  const firstWeekday = new Date(year, month, 1).getDay()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const cells: (string | null)[] = Array.from({ length: firstWeekday }, () => null)
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    cells.push(toISODate(new Date(year, month, day)))
+  }
+  while (cells.length % 7 !== 0) cells.push(null)
+  return cells
+}
+
 export function defaultMealType(time = nowTime()): import('./types').MealType {
   const hour = Number(time.slice(0, 2))
   if (hour >= 5 && hour < 9) return 'breakfast'
