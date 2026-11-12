@@ -4,7 +4,7 @@ type PhotoSlot = 'before' | 'after'
 
 export class OfflineError extends Error {
   constructor() {
-    super('The journal server is not running. Start it with npm run dev.')
+    super('The journal server is not running. Start it with pnpm dev.')
     this.name = 'OfflineError'
   }
 }

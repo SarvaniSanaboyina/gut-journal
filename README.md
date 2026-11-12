@@ -7,8 +7,8 @@ Entries are stored in a local **PGlite** (Postgres) database on this computer, a
 ## Run it
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 That starts:
@@ -16,13 +16,24 @@ That starts:
 - the Express + Prisma + PGlite API at http://127.0.0.1:8787
 - the website (usually http://localhost:5173), which talks to that API
 
-To run only the database server (after `npm run build`, it can also serve the website from `dist/`):
+To run only the database server (after `pnpm build`, it can also serve the website from `dist/`):
 
 ```bash
-npm run start
+pnpm start
 ```
 
-After changing `prisma/schema.prisma`, run `npm run prisma:generate`.
+After changing `prisma/schema.prisma`, run `pnpm prisma:generate`.
+
+## Backend Docker image
+
+The API (Express + Prisma + PGlite) can run in Docker. Journal data lives in a volume so it survives rebuilds.
+
+```bash
+docker build -t gut-journal-api .
+docker run --rm -p 8787:8787 -v gut-journal-data:/data/pglite gut-journal-api
+```
+
+Then open the website with `pnpm dev:web`, or call http://127.0.0.1:8787/api/health.
 
 ## What you can log
 

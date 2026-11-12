@@ -1,0 +1,10 @@
+.git
+.cursor
+.DS_Store
+data
+dist
+node_modules
+*.log
+.env
+.env.*
+agent-transcripts
