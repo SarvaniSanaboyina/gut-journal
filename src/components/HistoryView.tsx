@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { bristolMeta, mealLabel, moodMeta, stoolColorMeta } from '../constants'
+import { bristolMeta, moodMeta, stoolColorMeta } from '../constants'
 import {
   formatLongDate,
   formatMonthYear,
@@ -11,20 +11,12 @@ import {
   todayISO,
   weekdayLabels,
 } from '../dates'
-import {
-  formatCalories,
-  formatConsistency,
-  formatDuration,
-  formatQuantity,
-  hasCalories,
-  mealDurationMinutes,
-  totalCalories,
-} from '../meals'
+import { formatCalories, hasCalories, totalCalories } from '../meals'
 import { parseImportedJournal } from '../storage'
 import type { JournalData, MealEntry, MoodEntry, PoopEntry, WaterEntry } from '../types'
 import { formatTotalMl, formatWater, totalWaterMl } from '../water'
 import { Chevron, MoodFace, StoolArt, WaterDrop } from './Icons'
-import { MealPhotoStrip } from './MealPhotos'
+import { MealCard } from './MealCard'
 
 type Filter = 'all' | 'meals' | 'poops' | 'moods' | 'water'
 
@@ -245,36 +237,9 @@ function DayEntries({
           hint={caloriesLogged ? `${formatCalories(totalCalories(mealList))} this day` : `${mealList.length} logged`}
         >
           <div className="entry-list">
-            {mealList.map((entry) => {
-              const duration = mealDurationMinutes(entry)
-              const bits = [
-                entry.quantity != null ? formatQuantity(entry.quantity, entry.quantityUnit) : '',
-                formatConsistency(entry.consistency, entry.consistencyPercent),
-                entry.calories != null ? formatCalories(entry.calories) : '',
-                duration != null ? formatDuration(duration) : '',
-                entry.notes,
-              ].filter(Boolean)
-              return (
-                <div className="entry meal-card" key={entry.id}>
-                  <div className="entry-body">
-                    <span className="badge">{mealLabel(entry.type)}</span>
-                    <span>
-                      <div className="title">{entry.foods}</div>
-                      {bits.length > 0 && <div className="detail">{bits.join(' · ')}</div>}
-                    </span>
-                    <span className="meta">
-                      {formatTime(entry.time)}
-                      {entry.endTime ? ` – ${formatTime(entry.endTime)}` : ''}
-                    </span>
-                  </div>
-                  <MealPhotoStrip
-                    mealId={entry.id}
-                    before={entry.hasBeforePhoto}
-                    after={entry.hasAfterPhoto}
-                  />
-                </div>
-              )
-            })}
+            {mealList.map((entry) => (
+              <MealCard key={entry.id} entry={entry} />
+            ))}
           </div>
           {caloriesLogged && (
             <div className="calorie-total">

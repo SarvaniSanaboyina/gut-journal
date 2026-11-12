@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from './auth'
+import { AccountMenu } from './components/AccountMenu'
 import { AuthScreen } from './components/AuthScreen'
 import { HistoryView } from './components/HistoryView'
 import { Chevron } from './components/Icons'
@@ -100,20 +101,12 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
           </div>
           <div>
             <h1>{journalTitle(userName)}</h1>
-            <p>
-              <span className="tagline-long">Meals, water, poops, and mood</span>
-              <span className="tagline-short">Meals, water, poops, and mood</span>
-            </p>
           </div>
         </div>
-        <div className="account-actions">
-          <button className="sign-out" type="button" onClick={() => setPasswordOpen(true)}>
-            Password
-          </button>
-          <button className="sign-out" type="button" onClick={() => void onSignOut()}>
-            Sign out
-          </button>
-        </div>
+        <AccountMenu
+          onChangePassword={() => setPasswordOpen(true)}
+          onSignOut={() => void onSignOut()}
+        />
       </header>
 
       {journal.status !== 'ready' && (

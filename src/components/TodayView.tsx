@@ -1,18 +1,10 @@
-import { bristolMeta, mealLabel, moodMeta, stoolColorMeta } from '../constants'
+import { bristolMeta, moodMeta, stoolColorMeta } from '../constants'
 import { formatTime } from '../dates'
-import {
-  formatCalories,
-  formatConsistency,
-  formatDuration,
-  formatQuantity,
-  hasCalories,
-  mealDurationMinutes,
-  totalCalories,
-} from '../meals'
+import { formatCalories, hasCalories, totalCalories } from '../meals'
 import type { JournalData, MealEntry, MoodEntry, PoopEntry, WaterEntry } from '../types'
 import { formatTotalMl, formatWater, totalWaterMl } from '../water'
 import { MoodFace, StoolArt, WaterDrop } from './Icons'
-import { MealPhotoStrip } from './MealPhotos'
+import { MealCard } from './MealCard'
 
 function byTime<T extends { time: string }>(items: T[]) {
   return [...items].sort((a, b) => a.time.localeCompare(b.time))
@@ -99,36 +91,9 @@ export function TodayView({
         ) : (
           <>
             <div className="entry-list">
-              {meals.map((entry) => {
-                const duration = mealDurationMinutes(entry)
-                const bits = [
-                  entry.quantity != null ? formatQuantity(entry.quantity, entry.quantityUnit) : '',
-                  formatConsistency(entry.consistency, entry.consistencyPercent),
-                  entry.calories != null ? formatCalories(entry.calories) : '',
-                  duration != null ? formatDuration(duration) : '',
-                  entry.notes,
-                ].filter(Boolean)
-                return (
-                  <div key={entry.id} className="entry meal-card">
-                    <button className="entry-body" onClick={() => onEditMeal(entry)}>
-                      <span className="badge">{mealLabel(entry.type)}</span>
-                      <span>
-                        <div className="title">{entry.foods}</div>
-                        {bits.length > 0 && <div className="detail">{bits.join(' · ')}</div>}
-                      </span>
-                      <span className="meta">
-                        {formatTime(entry.time)}
-                        {entry.endTime ? ` – ${formatTime(entry.endTime)}` : ''}
-                      </span>
-                    </button>
-                    <MealPhotoStrip
-                      mealId={entry.id}
-                      before={entry.hasBeforePhoto}
-                      after={entry.hasAfterPhoto}
-                    />
-                  </div>
-                )
-              })}
+              {meals.map((entry) => (
+                <MealCard key={entry.id} entry={entry} onSelect={() => onEditMeal(entry)} />
+              ))}
             </div>
             {caloriesLogged && (
               <div className="calorie-total">

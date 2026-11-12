@@ -1,5 +1,19 @@
 import type { BristolType, MoodKind } from '../types'
 
+export function MenuIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+      <path
+        d="M4 6h12M4 10h12M4 14h12"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 export function Chevron({ dir }: { dir: 'left' | 'right' }) {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">

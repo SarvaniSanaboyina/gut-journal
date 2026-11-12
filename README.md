@@ -1,4 +1,4 @@
-# Gut journal
+# Journal
 
 A private website for tracking meals, poops, water, and mood.
 
