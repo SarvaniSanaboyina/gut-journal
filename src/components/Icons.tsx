@@ -1,22 +1,5 @@
 import type { BristolType, MoodKind } from '../types'
 
-export function LeafMark() {
-  return (
-    <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
-      <path
-        d="M6 18c8-1 12-7 13-14-7 2-14 7-13 14Z"
-        fill="#f6efe4"
-      />
-      <path
-        d="M8 17c5-2 8-7 9-12"
-        stroke="#3e5a4c"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-    </svg>
-  )
-}
-
 export function Chevron({ dir }: { dir: 'left' | 'right' }) {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
@@ -62,15 +45,15 @@ export function WaterDrop() {
     <svg className="water-drop" viewBox="0 0 24 24" aria-hidden="true">
       <path
         d="M12 3.5C12 3.5 6.5 10.2 6.5 14.2a5.5 5.5 0 0 0 11 0C17.5 10.2 12 3.5 12 3.5Z"
-        fill="#d7e6ee"
-        stroke="#4d7388"
+        fill="#d7ebf8"
+        stroke="#5a8eb8"
         strokeWidth="1.3"
         strokeLinejoin="round"
       />
       <path
         d="M10 14.5c.4 1.6 2.2 2.2 3.4 1.4"
         fill="none"
-        stroke="#6e91a6"
+        stroke="#8ec8f0"
         strokeWidth="1.3"
         strokeLinecap="round"
       />
@@ -90,8 +73,8 @@ export function MoodFace({ mood }: { mood: MoodKind }) {
   }
   return (
     <svg className="mood-face" viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="9" fill="#f4e4c8" stroke="#2b231c" strokeWidth="1.2" />
-      <path d={faces[mood]} fill="none" stroke="#2b231c" strokeWidth="1.4" strokeLinecap="round" />
+      <circle cx="12" cy="12" r="9" fill="#f4e4c8" stroke="#3a2d52" strokeWidth="1.2" />
+      <path d={faces[mood]} fill="none" stroke="#3a2d52" strokeWidth="1.4" strokeLinecap="round" />
     </svg>
   )
 }

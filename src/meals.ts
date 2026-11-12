@@ -1,5 +1,5 @@
 import { mealLabel } from './constants'
-import { previousWeekDates, weekDates } from './dates'
+import { monthDates, previousMonthDates, previousWeekDates, weekDates } from './dates'
 import type {
   JournalData,
   MealConsistency,
@@ -108,13 +108,17 @@ function trendWord(change: number | null): 'up' | 'down' | 'same' | 'unknown' {
   return 'same'
 }
 
-type WeekSlice = {
+export type ReportPeriod = 'week' | 'month'
+
+type PeriodSlice = {
   meals: MealEntry[]
   days: string[]
   totalMeals: number
   daysWithMeals: number
   totalMl: number
   mealsWithQuantity: number
+  calorieTotal: number
+  mealsWithCalories: number
   avgDuration: number | null
   durations: number[]
   byType: Record<MealType, number>
@@ -123,7 +127,7 @@ type WeekSlice = {
   breakfastStarts: number[]
 }
 
-function sliceWeek(data: JournalData, days: string[]): WeekSlice {
+function slicePeriod(data: JournalData, days: string[]): PeriodSlice {
   const meals = data.meals.filter((item) => days.includes(item.date))
   const durations = meals
     .map((item) => mealDurationMinutes(item))
@@ -153,6 +157,8 @@ function sliceWeek(data: JournalData, days: string[]): WeekSlice {
     daysWithMeals: new Set(meals.map((item) => item.date)).size,
     totalMl: sum(mls),
     mealsWithQuantity: mls.length,
+    calorieTotal: totalCalories(meals),
+    mealsWithCalories: meals.filter((item) => item.calories != null).length,
     avgDuration: mean(durations),
     durations,
     byType,
@@ -162,10 +168,18 @@ function sliceWeek(data: JournalData, days: string[]): WeekSlice {
   }
 }
 
-export type WeeklyReport = {
-  thisWeek: WeekSlice
-  lastWeek: WeekSlice
+export type PeriodReport = {
+  period: ReportPeriod
+  thisPeriod: PeriodSlice
+  lastPeriod: PeriodSlice
   quantity: {
+    trend: 'up' | 'down' | 'same' | 'unknown'
+    change: number | null
+    thisTotal: number
+    lastTotal: number
+    label: string
+  }
+  calories: {
     trend: 'up' | 'down' | 'same' | 'unknown'
     change: number | null
     thisTotal: number
@@ -191,36 +205,59 @@ export type WeeklyReport = {
   observations: string[]
 }
 
+export type WeeklyReport = PeriodReport
+
 function formatSignedPercent(change: number): string {
   const rounded = Math.abs(change) >= 10 ? Math.round(change) : Math.round(change * 10) / 10
   const value = Math.abs(rounded)
   return `${value}%`
 }
 
-export function buildWeeklyReport(data: JournalData, endISO: string): WeeklyReport {
-  const thisDays = weekDates(endISO)
-  const lastDays = previousWeekDates(thisDays)
-  const thisWeek = sliceWeek(data, thisDays)
-  const lastWeek = sliceWeek(data, lastDays)
+export function buildPeriodReport(
+  data: JournalData,
+  thisDays: string[],
+  lastDays: string[],
+  period: ReportPeriod,
+): PeriodReport {
+  const thisPeriod = slicePeriod(data, thisDays)
+  const lastPeriod = slicePeriod(data, lastDays)
+  const lastLabel = period === 'week' ? 'last week' : 'last month'
+  const thisLabel = period === 'week' ? 'this week' : 'this month'
+  const nextLabel = period === 'week' ? 'next week' : 'next month'
 
-  const qtyChange = thisWeek.mealsWithQuantity && lastWeek.mealsWithQuantity
-    ? percentChange(thisWeek.totalMl, lastWeek.totalMl)
+  const qtyChange = thisPeriod.mealsWithQuantity && lastPeriod.mealsWithQuantity
+    ? percentChange(thisPeriod.totalMl, lastPeriod.totalMl)
     : null
   const qtyTrend = trendWord(qtyChange)
   const quantityLabel =
     qtyTrend === 'unknown'
-      ? thisWeek.mealsWithQuantity
-        ? 'Log quantities for another week to compare intake.'
-        : 'Add how much he ate to track intake.'
+      ? thisPeriod.mealsWithQuantity
+        ? `Log quantities for another ${period} to compare intake.`
+        : 'Add how much was eaten to track intake.'
       : qtyTrend === 'up'
-        ? `Quantity intake increased by about ${formatSignedPercent(qtyChange!)} vs last week.`
+        ? `Quantity intake increased by about ${formatSignedPercent(qtyChange!)} vs ${lastLabel}.`
         : qtyTrend === 'down'
-          ? `Quantity intake decreased by about ${formatSignedPercent(qtyChange!)} vs last week.`
-          : 'Quantity intake stayed about the same as last week.'
+          ? `Quantity intake decreased by about ${formatSignedPercent(qtyChange!)} vs ${lastLabel}.`
+          : `Quantity intake stayed about the same as ${lastLabel}.`
+
+  const calChange = thisPeriod.mealsWithCalories && lastPeriod.mealsWithCalories
+    ? percentChange(thisPeriod.calorieTotal, lastPeriod.calorieTotal)
+    : null
+  const calTrend = trendWord(calChange)
+  const caloriesLabel =
+    calTrend === 'unknown'
+      ? thisPeriod.mealsWithCalories
+        ? `Log calories for another ${period} to compare.`
+        : 'Add calories on meals to track energy intake.'
+      : calTrend === 'up'
+        ? `Calories increased by about ${formatSignedPercent(calChange!)} vs ${lastLabel}.`
+        : calTrend === 'down'
+          ? `Calories decreased by about ${formatSignedPercent(calChange!)} vs ${lastLabel}.`
+          : `Calories stayed about the same as ${lastLabel}.`
 
   const timeChange =
-    thisWeek.avgDuration != null && lastWeek.avgDuration != null
-      ? percentChange(thisWeek.avgDuration, lastWeek.avgDuration)
+    thisPeriod.avgDuration != null && lastPeriod.avgDuration != null
+      ? percentChange(thisPeriod.avgDuration, lastPeriod.avgDuration)
       : null
   const thisWater = weekWater(data, thisDays)
   const lastWater = weekWater(data, lastDays)
@@ -231,73 +268,73 @@ export function buildWeeklyReport(data: JournalData, endISO: string): WeeklyRepo
   const waterLabel =
     waterTrend === 'unknown'
       ? thisWater.count
-        ? 'Log water for another week to compare drinks.'
-        : 'Add water logs to track how much he drinks.'
+        ? `Log water for another ${period} to compare drinks.`
+        : 'Add water logs to track drinks.'
       : waterTrend === 'up'
-        ? `Water intake increased by about ${formatSignedPercent(waterChange!)} vs last week.`
+        ? `Water intake increased by about ${formatSignedPercent(waterChange!)} vs ${lastLabel}.`
         : waterTrend === 'down'
-          ? `Water intake decreased by about ${formatSignedPercent(waterChange!)} vs last week.`
-          : 'Water intake stayed about the same as last week.'
+          ? `Water intake decreased by about ${formatSignedPercent(waterChange!)} vs ${lastLabel}.`
+          : `Water intake stayed about the same as ${lastLabel}.`
 
   const timeTrend = trendWord(timeChange)
   const mealTimeLabel =
     timeTrend === 'unknown'
-      ? thisWeek.avgDuration != null
-        ? `Meals lasted about ${formatDuration(Math.round(thisWeek.avgDuration))} on average. Log end times next week to compare.`
-        : 'Add meal end times to track how long he takes to eat.'
+      ? thisPeriod.avgDuration != null
+        ? `Meals lasted about ${formatDuration(Math.round(thisPeriod.avgDuration))} on average. Log end times ${nextLabel} to compare.`
+        : 'Add meal end times to track how long meals take.'
       : timeTrend === 'up'
-        ? `Meal time increased by about ${formatSignedPercent(timeChange!)} vs last week.`
+        ? `Meal time increased by about ${formatSignedPercent(timeChange!)} vs ${lastLabel}.`
         : timeTrend === 'down'
-          ? `Meal time decreased by about ${formatSignedPercent(timeChange!)} vs last week.`
-          : 'Meal time stayed about the same as last week.'
+          ? `Meal time decreased by about ${formatSignedPercent(timeChange!)} vs ${lastLabel}.`
+          : `Meal time stayed about the same as ${lastLabel}.`
 
   const observations: string[] = []
 
-  if (thisWeek.totalMeals === 0) {
-    observations.push('No meals logged this week yet.')
+  if (thisPeriod.totalMeals === 0) {
+    observations.push(`No meals logged ${thisLabel} yet.`)
   } else {
     observations.push(
-      `${thisWeek.totalMeals} meal${thisWeek.totalMeals === 1 ? '' : 's'} across ${thisWeek.daysWithMeals} day${thisWeek.daysWithMeals === 1 ? '' : 's'}.`,
+      `${thisPeriod.totalMeals} meal${thisPeriod.totalMeals === 1 ? '' : 's'} across ${thisPeriod.daysWithMeals} day${thisPeriod.daysWithMeals === 1 ? '' : 's'}.`,
     )
   }
 
   const snackCount =
-    thisWeek.byType['morning-snack'] + thisWeek.byType['evening-snack'] + thisWeek.byType['mini-snack']
+    thisPeriod.byType['morning-snack'] + thisPeriod.byType['evening-snack'] + thisPeriod.byType['mini-snack']
   const lastSnackCount =
-    lastWeek.byType['morning-snack'] + lastWeek.byType['evening-snack'] + lastWeek.byType['mini-snack']
-  if (thisWeek.totalMeals && lastWeek.totalMeals) {
-    if (snackCount > lastSnackCount + 1) observations.push('He had more snacks than last week.')
-    if (snackCount < lastSnackCount - 1) observations.push('He had fewer snacks than last week.')
+    lastPeriod.byType['morning-snack'] + lastPeriod.byType['evening-snack'] + lastPeriod.byType['mini-snack']
+  if (thisPeriod.totalMeals && lastPeriod.totalMeals) {
+    if (snackCount > lastSnackCount + 1) observations.push(`More snacks than ${lastLabel}.`)
+    if (snackCount < lastSnackCount - 1) observations.push(`Fewer snacks than ${lastLabel}.`)
   }
 
-  if (thisWeek.daysWithMeals >= 3 && thisWeek.byType.breakfast < thisWeek.daysWithMeals) {
+  if (thisPeriod.daysWithMeals >= 3 && thisPeriod.byType.breakfast < thisPeriod.daysWithMeals) {
     observations.push('Some days had no breakfast logged.')
-  } else if (thisWeek.daysWithMeals >= 4 && thisWeek.byType.breakfast >= thisWeek.daysWithMeals - 1) {
+  } else if (thisPeriod.daysWithMeals >= 4 && thisPeriod.byType.breakfast >= thisPeriod.daysWithMeals - 1) {
     observations.push('Breakfast was logged most days.')
   }
 
-  const solids = thisWeek.byConsistency.solid
-  const liquids = thisWeek.byConsistency.liquid
-  const semi = thisWeek.byConsistency['semi-solid']
+  const solids = thisPeriod.byConsistency.solid
+  const liquids = thisPeriod.byConsistency.liquid
+  const semi = thisPeriod.byConsistency['semi-solid']
   if (solids + liquids + semi >= 3) {
-    if (liquids > solids && liquids > semi) observations.push('Liquids made up more of his meals than solids.')
-    else if (solids > liquids + semi) observations.push('Most meals this week were solids.')
-    else if (semi >= solids && semi >= liquids) observations.push('Semi-solids showed up often this week.')
+    if (liquids > solids && liquids > semi) observations.push('Liquids made up more of the meals than solids.')
+    else if (solids > liquids + semi) observations.push(`Most meals ${thisLabel} were solids.`)
+    else if (semi >= solids && semi >= liquids) observations.push(`Semi-solids showed up often ${thisLabel}.`)
   }
 
-  const avgThick = mean(thisWeek.semiSolidPercents)
+  const avgThick = mean(thisPeriod.semiSolidPercents)
   if (avgThick != null) {
     observations.push(`Semi-solids averaged about ${Math.round(avgThick)}% thick.`)
   }
 
-  if (thisWeek.avgDuration != null) {
-    if (thisWeek.avgDuration >= 35) observations.push('Meals ran long on average (over 35 minutes).')
-    else if (thisWeek.avgDuration <= 12) observations.push('Meals were fairly quick this week.')
+  if (thisPeriod.avgDuration != null) {
+    if (thisPeriod.avgDuration >= 35) observations.push('Meals ran long on average (over 35 minutes).')
+    else if (thisPeriod.avgDuration <= 12) observations.push(`Meals were fairly quick ${thisLabel}.`)
   }
 
   const longestType = MEAL_TYPES
     .map((type) => {
-      const mins = thisWeek.meals
+      const mins = thisPeriod.meals
         .filter((item) => item.type === type)
         .map((item) => mealDurationMinutes(item))
         .filter((item): item is number => item != null)
@@ -309,56 +346,64 @@ export function buildWeeklyReport(data: JournalData, endISO: string): WeeklyRepo
     observations.push(`${mealLabel(longestType.type)} took the longest, about ${formatDuration(Math.round(longestType.avg))}.`)
   }
 
-  const avgBreakfast = mean(thisWeek.breakfastStarts)
-  const lastBreakfast = mean(lastWeek.breakfastStarts)
+  const avgBreakfast = mean(thisPeriod.breakfastStarts)
+  const lastBreakfast = mean(lastPeriod.breakfastStarts)
   if (avgBreakfast != null && lastBreakfast != null) {
     const diff = avgBreakfast - lastBreakfast
-    if (diff >= 20) observations.push('Breakfast started later than last week.')
-    if (diff <= -20) observations.push('Breakfast started earlier than last week.')
+    if (diff >= 20) observations.push(`Breakfast started later than ${lastLabel}.`)
+    if (diff <= -20) observations.push(`Breakfast started earlier than ${lastLabel}.`)
   }
 
   if (thisWater.count === 0) {
-    observations.push('No water logged this week yet.')
+    observations.push(`No water logged ${thisLabel} yet.`)
   } else {
     observations.push(
       `${thisWater.count} drink${thisWater.count === 1 ? '' : 's'} totaling ${formatTotalMl(thisWater.totalMl)} across ${thisWater.daysWithWater} day${thisWater.daysWithWater === 1 ? '' : 's'}.`,
     )
   }
 
-  const weekPoops = data.poops.filter((item) => thisDays.includes(item.date))
-  const loose = weekPoops.filter((item) => item.bristol >= 6).length
+  const periodPoops = data.poops.filter((item) => thisDays.includes(item.date))
+  const loose = periodPoops.filter((item) => item.bristol >= 6).length
   if (loose >= 2 && liquids > solids) {
-    observations.push('Looser stools showed up in a week with more liquids.')
+    observations.push(`Looser stools showed up in a ${period} with more liquids.`)
   }
-  const hard = weekPoops.filter((item) => item.bristol <= 2).length
+  const hard = periodPoops.filter((item) => item.bristol <= 2).length
   if (hard >= 2 && solids > liquids) {
-    observations.push('Harder stools showed up in a week with more solids.')
+    observations.push(`Harder stools showed up in a ${period} with more solids.`)
   }
   if (hard >= 2 && thisWater.count > 0 && thisWater.daysWithWater <= Math.max(1, Math.floor(thisDays.length / 2))) {
-    observations.push('Harder stools showed up in a week with little water logged.')
+    observations.push(`Harder stools showed up in a ${period} with little water logged.`)
   }
 
-  const weekMoods = data.moods.filter((item) => thisDays.includes(item.date))
-  const fussy = weekMoods.filter((item) => item.mood === 'fussy' || item.mood === 'irritable' || item.mood === 'tummy').length
-  if (fussy >= 3 && thisWeek.avgDuration != null && thisWeek.avgDuration >= 30) {
+  const periodMoods = data.moods.filter((item) => thisDays.includes(item.date))
+  const fussy = periodMoods.filter((item) => item.mood === 'fussy' || item.mood === 'irritable' || item.mood === 'tummy').length
+  if (fussy >= 3 && thisPeriod.avgDuration != null && thisPeriod.avgDuration >= 30) {
     observations.push('Fussy or tummy-ache moods showed up alongside longer meals.')
   }
 
   return {
-    thisWeek,
-    lastWeek,
+    period,
+    thisPeriod,
+    lastPeriod,
     quantity: {
       trend: qtyTrend,
       change: qtyChange,
-      thisTotal: thisWeek.totalMl,
-      lastTotal: lastWeek.totalMl,
+      thisTotal: thisPeriod.totalMl,
+      lastTotal: lastPeriod.totalMl,
       label: quantityLabel,
+    },
+    calories: {
+      trend: calTrend,
+      change: calChange,
+      thisTotal: thisPeriod.calorieTotal,
+      lastTotal: lastPeriod.calorieTotal,
+      label: caloriesLabel,
     },
     mealTime: {
       trend: timeTrend,
       change: timeChange,
-      thisAvg: thisWeek.avgDuration,
-      lastAvg: lastWeek.avgDuration,
+      thisAvg: thisPeriod.avgDuration,
+      lastAvg: lastPeriod.avgDuration,
       label: mealTimeLabel,
     },
     water: {
@@ -372,4 +417,14 @@ export function buildWeeklyReport(data: JournalData, endISO: string): WeeklyRepo
     },
     observations,
   }
+}
+
+export function buildWeeklyReport(data: JournalData, endISO: string): PeriodReport {
+  const thisDays = weekDates(endISO)
+  return buildPeriodReport(data, thisDays, previousWeekDates(thisDays), 'week')
+}
+
+export function buildMonthlyReport(data: JournalData, endISO: string): PeriodReport {
+  const thisDays = monthDates(endISO)
+  return buildPeriodReport(data, thisDays, previousMonthDates(thisDays), 'month')
 }

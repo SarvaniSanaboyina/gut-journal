@@ -6,6 +6,29 @@ datasource db {
   provider = "postgresql"
 }
 
+model Account {
+  id           String   @id
+  name         String
+  passwordHash String   @map("password_hash")
+  passwordSalt String   @map("password_salt")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  sessions     Session[]
+
+  @@map("accounts")
+}
+
+model Session {
+  id        String   @id
+  tokenHash String   @unique @map("token_hash")
+  accountId String   @map("account_id")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId], map: "sessions_account_idx")
+  @@map("sessions")
+}
+
 model Meal {
   id                 String    @id
   date               String

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  AuthError,
   deleteMeal,
   deleteMood,
   deletePoop,
@@ -29,7 +30,7 @@ import type {
 } from './types'
 import { emptyJournal } from './types'
 
-const STORAGE_KEY = 'ashrit-journal-v1'
+const STORAGE_KEY = 'gut-journal-v1'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -155,7 +156,7 @@ async function loadFromServer(): Promise<JournalData> {
       return await getJournal()
     } catch (error) {
       lastError = error
-      if (!(error instanceof OfflineError) || attempt === 39) throw error
+      if (error instanceof AuthError || !(error instanceof OfflineError) || attempt === 39) throw error
       await new Promise((resolve) => setTimeout(resolve, 500))
     }
   }

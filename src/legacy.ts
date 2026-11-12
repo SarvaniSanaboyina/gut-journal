@@ -1,7 +1,7 @@
 import { blobToDataUrl } from './photos'
 import type { MealEntry } from './types'
 
-const DB_NAME = 'ashrit-journal-photos'
+const DB_NAME = 'gut-journal-photos'
 const DB_VERSION = 1
 const STORE = 'photos'
 

@@ -1,6 +1,6 @@
-# Ashrit's Gut Journal
+# Gut journal
 
-A private website for tracking Ashrit's meals, poops, and mood.
+A private website for tracking meals, poops, water, and mood.
 
 Entries are accessed with **Prisma** through an **Express** API. By default, the app uses a local **PGlite** database. Set `DATABASE_URL` to use a Postgres server instead.
 
@@ -52,4 +52,4 @@ Production runs at https://gut.sarvani.dev on the Hetzner Coolify server. It use
 - **Mood** — happy, calm, energetic, fussy, irritable, tired, or tummy ache
 - **Day notes** — sleep, fever, travel, or anything else worth remembering
 
-Today is for logging. Week shows 7-day patterns. History is the full timeline, with backup export/import.
+Today is for logging. Reports shows weekly (Monday–Sunday) and monthly (1st–month end) patterns. History is the full timeline, with backup export/import.

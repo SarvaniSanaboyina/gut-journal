@@ -96,6 +96,55 @@ export function previousWeekDates(days: string[]): string[] {
   return days.map((iso) => shiftDate(iso, -7))
 }
 
+export function monthStart(iso: string): string {
+  const date = parseISODate(iso)
+  return toISODate(new Date(date.getFullYear(), date.getMonth(), 1))
+}
+
+export function monthEnd(iso: string): string {
+  const date = parseISODate(iso)
+  return toISODate(new Date(date.getFullYear(), date.getMonth() + 1, 0))
+}
+
+/** First of the month containing `iso`, through month-end or today — whichever is earlier. */
+export function monthDates(iso: string, capISO = todayISO()): string[] {
+  const start = monthStart(iso)
+  const end = monthEnd(iso)
+  const last = end < capISO ? end : capISO
+  return dateRange(start, last)
+}
+
+export function previousMonthDates(days: string[]): string[] {
+  if (days.length === 0) return []
+  const start = parseISODate(days[0])
+  const prevStart = new Date(start.getFullYear(), start.getMonth() - 1, 1)
+  const prevLastDay = new Date(start.getFullYear(), start.getMonth(), 0).getDate()
+  const last = new Date(prevStart)
+  last.setDate(Math.min(days.length, prevLastDay))
+  return dateRange(toISODate(prevStart), toISODate(last))
+}
+
+export function shiftDateByMonth(iso: string, delta: number, capISO = todayISO()): string {
+  const date = parseISODate(iso)
+  const next = new Date(date.getFullYear(), date.getMonth() + delta, 1)
+  const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate()
+  next.setDate(Math.min(date.getDate(), lastDay))
+  const shifted = toISODate(next)
+  return shifted > capISO ? capISO : shifted
+}
+
+export function monthCellsMonday(year: number, month: number): (string | null)[] {
+  const firstWeekday = new Date(year, month, 1).getDay()
+  const leading = firstWeekday === 0 ? 6 : firstWeekday - 1
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const cells: (string | null)[] = Array.from({ length: leading }, () => null)
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    cells.push(toISODate(new Date(year, month, day)))
+  }
+  while (cells.length % 7 !== 0) cells.push(null)
+  return cells
+}
+
 export function formatWeekRange(days: string[]): string {
   if (days.length === 0) return ''
   if (days.length === 1) return formatLongDate(days[0])
@@ -110,6 +159,19 @@ export function formatWeekRange(days: string[]): string {
     day: 'numeric',
   })
   return `${start} – ${end}`
+}
+
+export function formatMonthRange(days: string[]): string {
+  if (days.length === 0) return ''
+  const start = parseISODate(days[0])
+  const end = parseISODate(days[days.length - 1])
+  const fullEnd = monthEnd(days[0])
+  if (start.getDate() === 1 && days[days.length - 1] === fullEnd) {
+    return formatMonthYear(start.getFullYear(), start.getMonth())
+  }
+  const monthYear = end.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+  if (days.length === 1) return `${start.getDate()} ${monthYear}`
+  return `${start.getDate()}–${end.getDate()} ${monthYear}`
 }
 
 export function weekdayLabels(): string[] {

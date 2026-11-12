@@ -75,6 +75,24 @@ CREATE INDEX IF NOT EXISTS poops_date_idx ON poops (date, time);
 CREATE INDEX IF NOT EXISTS moods_date_idx ON moods (date, time);
 CREATE INDEX IF NOT EXISTS waters_date_idx ON waters (date, time);
 
+CREATE TABLE IF NOT EXISTS accounts (
+  id text PRIMARY KEY,
+  name text NOT NULL,
+  password_hash text NOT NULL,
+  password_salt text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  id text PRIMARY KEY,
+  token_hash text NOT NULL UNIQUE,
+  account_id text NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  expires_at timestamptz NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS sessions_account_idx ON sessions (account_id);
+
 ALTER TABLE meals ADD COLUMN IF NOT EXISTS calories double precision;
 `
 

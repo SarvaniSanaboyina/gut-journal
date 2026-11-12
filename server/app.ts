@@ -3,6 +3,15 @@ import { join } from 'node:path'
 import type { PrismaClient } from '@prisma/client'
 import express, { type NextFunction, type Request, type Response } from 'express'
 import {
+  authStatus,
+  changePassword,
+  isPublicApi,
+  login,
+  logout,
+  requireAuth,
+  setupAccount,
+} from './auth.ts'
+import {
   HttpError,
   checkPhotoMime,
   exportJournal,
@@ -52,6 +61,59 @@ export function createApp(prisma: PrismaClient, options: { distDir?: string } = 
     res.json({ ok: true, orm: 'prisma' })
   })
 
+  app.use(express.json({ limit: JSON_LIMIT }))
+
+  app.get('/api/auth/status', async (req, res) => {
+    try {
+      res.set('cache-control', 'no-store')
+      res.json(await authStatus(prisma, req))
+    } catch (error) {
+      sendError(res, error)
+    }
+  })
+
+  app.post('/api/auth/setup', async (req, res) => {
+    try {
+      res.json(await setupAccount(prisma, req, res))
+    } catch (error) {
+      sendError(res, error)
+    }
+  })
+
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      res.json(await login(prisma, req, res))
+    } catch (error) {
+      sendError(res, error)
+    }
+  })
+
+  app.post('/api/auth/logout', async (req, res) => {
+    try {
+      await logout(prisma, req, res)
+      res.status(204).end()
+    } catch (error) {
+      sendError(res, error)
+    }
+  })
+
+  app.use((req, res, next) => {
+    if (isPublicApi(req) || !req.path.startsWith('/api')) {
+      next()
+      return
+    }
+    void requireAuth(prisma)(req, res, next)
+  })
+
+  app.post('/api/password', async (req, res) => {
+    try {
+      await changePassword(prisma, req)
+      res.status(204).end()
+    } catch (error) {
+      sendError(res, error)
+    }
+  })
+
   app.get('/api/photos/:mealId/:slot', async (req, res) => {
     try {
       const stored = await readPhoto(prisma, param(req.params.mealId), parsePhotoSlot(param(req.params.slot)))
@@ -95,8 +157,6 @@ export function createApp(prisma: PrismaClient, options: { distDir?: string } = 
       sendError(res, error)
     }
   })
-
-  app.use(express.json({ limit: JSON_LIMIT }))
 
   app.get('/api/journal', async (_req, res) => {
     res.set('cache-control', 'no-store')

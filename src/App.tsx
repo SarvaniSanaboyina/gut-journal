@@ -1,19 +1,22 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useAuth } from './auth'
+import { AuthScreen } from './components/AuthScreen'
 import { HistoryView } from './components/HistoryView'
-import { Chevron, LeafMark } from './components/Icons'
+import { Chevron } from './components/Icons'
 import { MealForm } from './components/MealForm'
 import { Modal } from './components/Modal'
 import { MoodForm } from './components/MoodForm'
+import { PasswordForm } from './components/PasswordForm'
 import { PoopForm } from './components/PoopForm'
 import { TodayView } from './components/TodayView'
 import { WaterForm } from './components/WaterForm'
-import { WeekView } from './components/WeekView'
-import { APP_NAME } from './constants'
+import { ReportsView } from './components/ReportsView'
+import { journalTitle } from './constants'
 import { formatLongDate, isToday, shiftDate, todayISO } from './dates'
 import { useJournal } from './storage'
 import type { MealEntry, MoodEntry, PoopEntry, WaterEntry } from './types'
 
-type View = 'today' | 'week' | 'history'
+type View = 'today' | 'reports' | 'history'
 type Editor =
   | { kind: 'meal'; entry?: MealEntry }
   | { kind: 'poop'; entry?: PoopEntry }
@@ -30,10 +33,58 @@ async function persist(action: () => Promise<unknown>, onDone?: () => void) {
 }
 
 export default function App() {
+  const auth = useAuth()
+  const heading = journalTitle(auth.user?.name ?? auth.accountName)
+
+  useEffect(() => {
+    document.title = heading
+  }, [heading])
+
+  if (auth.status === 'loading' || auth.status === 'error') {
+    return (
+      <div className="app locked">
+        <header className="topbar">
+          <div className="brand">
+            <div className="mark">
+              <img src="/favicon.png" alt="" width="46" height="46" />
+            </div>
+            <div>
+              <h1>{heading}</h1>
+              <p>Family password lock</p>
+            </div>
+          </div>
+        </header>
+        <section className="status-panel">
+          {auth.status === 'loading' ? (
+            <>
+              <h2>Opening journal</h2>
+              <p>Connecting to the local PGlite database…</p>
+            </>
+          ) : (
+            <>
+              <h2>Could not open the journal</h2>
+              <p>{auth.error}</p>
+              <button className="add-btn" onClick={auth.reload}>Try again</button>
+            </>
+          )}
+        </section>
+      </div>
+    )
+  }
+
+  if (auth.status !== 'signed-in' || !auth.user) {
+    return <AuthScreen auth={auth} />
+  }
+
+  return <JournalApp userName={auth.user.name} onSignOut={auth.signOut} />
+}
+
+function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () => Promise<void> }) {
   const journal = useJournal()
   const [date, setDate] = useState(todayISO)
   const [view, setView] = useState<View>('today')
   const [editor, setEditor] = useState<Editor | null>(null)
+  const [passwordOpen, setPasswordOpen] = useState(false)
 
   const title = useMemo(() => {
     if (isToday(date)) return 'Today'
@@ -45,15 +96,23 @@ export default function App() {
       <header className="topbar">
         <div className="brand">
           <div className="mark">
-            <LeafMark />
+            <img src="/favicon.png" alt="" width="46" height="46" />
           </div>
           <div>
-            <h1>{APP_NAME}</h1>
+            <h1>{journalTitle(userName)}</h1>
             <p>
-              <span className="tagline-long">Meals, water, poops, and mood — saved in a local PGlite database</span>
+              <span className="tagline-long">Meals, water, poops, and mood</span>
               <span className="tagline-short">Meals, water, poops, and mood</span>
             </p>
           </div>
+        </div>
+        <div className="account-actions">
+          <button className="sign-out" type="button" onClick={() => setPasswordOpen(true)}>
+            Password
+          </button>
+          <button className="sign-out" type="button" onClick={() => void onSignOut()}>
+            Sign out
+          </button>
         </div>
       </header>
 
@@ -78,7 +137,7 @@ export default function App() {
         <div className="save-banner">{journal.saveError}</div>
       )}
 
-      {journal.status === 'ready' && view !== 'history' && (
+      {journal.status === 'ready' && view === 'today' && (
         <div className="date-nav">
           <button className="icon-btn" onClick={() => setDate(shiftDate(date, -1))} aria-label="Previous day">
             <Chevron dir="left" />
@@ -111,6 +170,7 @@ export default function App() {
       {journal.status === 'ready' && view === 'today' && (
         <TodayView
           date={date}
+          name={userName}
           data={journal.data}
           onAddMeal={() => setEditor({ kind: 'meal' })}
           onAddPoop={() => setEditor({ kind: 'poop' })}
@@ -125,10 +185,11 @@ export default function App() {
         />
       )}
 
-      {journal.status === 'ready' && view === 'week' && (
-        <WeekView
+      {journal.status === 'ready' && view === 'reports' && (
+        <ReportsView
           date={date}
           data={journal.data}
+          onChangeDate={setDate}
           onSelectDate={(iso) => {
             setDate(iso)
             setView('today')
@@ -148,12 +209,12 @@ export default function App() {
         />
       )}
 
-      <nav className="tabs" hidden={Boolean(editor) || journal.status !== 'ready'}>
+      <nav className="tabs" hidden={Boolean(editor) || passwordOpen || journal.status !== 'ready'}>
         <button className={view === 'today' ? 'active' : ''} onClick={() => setView('today')}>
           Today
         </button>
-        <button className={view === 'week' ? 'active' : ''} onClick={() => setView('week')}>
-          Week
+        <button className={view === 'reports' ? 'active' : ''} onClick={() => setView('reports')}>
+          Reports
         </button>
         <button className={view === 'history' ? 'active' : ''} onClick={() => setView('history')}>
           History
@@ -246,6 +307,15 @@ export default function App() {
                 : undefined
             }
             onCancel={() => setEditor(null)}
+          />
+        </Modal>
+      )}
+
+      {passwordOpen && (
+        <Modal title="Change password" onClose={() => setPasswordOpen(false)}>
+          <PasswordForm
+            onCancel={() => setPasswordOpen(false)}
+            onSaved={() => setPasswordOpen(false)}
           />
         </Modal>
       )}

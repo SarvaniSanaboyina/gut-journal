@@ -20,6 +20,7 @@ function byTime<T extends { time: string }>(items: T[]) {
 
 export function TodayView({
   date,
+  name,
   data,
   onAddMeal,
   onAddPoop,
@@ -33,6 +34,7 @@ export function TodayView({
   onNoteBlur,
 }: {
   date: string
+  name: string
   data: JournalData
   onAddMeal: () => void
   onAddPoop: () => void
@@ -93,7 +95,7 @@ export function TodayView({
           <button className="add-btn" onClick={onAddMeal}>+ Add</button>
         </div>
         {meals.length === 0 ? (
-          <div className="empty">Nothing logged yet. Add what Ashrit ate today.</div>
+          <div className="empty">Nothing logged yet. Add what {name} ate today.</div>
         ) : (
           <>
             <div className="entry-list">
@@ -147,7 +149,7 @@ export function TodayView({
           <button className="add-btn" onClick={onAddWater}>+ Add</button>
         </div>
         {waters.length === 0 ? (
-          <div className="empty">No water logged yet. Add a drink when he has one.</div>
+          <div className="empty">No water logged yet. Add a drink when they have one.</div>
         ) : (
           <>
             <div className="entry-list">
@@ -216,7 +218,7 @@ export function TodayView({
         <div className="section-head">
           <div>
             <h3>Mood</h3>
-            <p>How Ashrit seemed through the day</p>
+            <p>How {name} seemed through the day</p>
           </div>
           <button className="add-btn" onClick={onAddMood}>+ Add</button>
         </div>

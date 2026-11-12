@@ -77,8 +77,8 @@ export function HistoryView({
         {(['all', 'meals', 'poops', 'moods', 'water'] as const).map((item) => (
           <button
             key={item}
+            className={filter === item ? 'active' : undefined}
             onClick={() => setFilter(item)}
-            style={filter === item ? { background: '#eef4ee', borderColor: '#3e5a4c' } : undefined}
           >
             {item[0].toUpperCase() + item.slice(1)}
           </button>

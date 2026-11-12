@@ -8,8 +8,13 @@ import type {
   StoolColor,
 } from './types'
 
-export const CHILD_NAME = 'Ashrit'
-export const APP_NAME = `${CHILD_NAME}'s Gut Journal`
+export const APP_NAME = 'Gut journal'
+
+export function journalTitle(name?: string | null) {
+  const trimmed = name?.trim()
+  if (!trimmed) return APP_NAME
+  return `${trimmed}'s gut journal`
+}
 
 export const MEAL_TYPES: {
   id: MealType
