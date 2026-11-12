@@ -106,7 +106,7 @@ function normalize(raw: unknown): JournalData {
   }
 
   if (Array.isArray(raw.waters)) {
-    data.waters = raw.waters.filter(isRecord).map((item) => {
+    data.waters = raw.waters.filter(isRecord).map((item): WaterEntry => {
       const unit = asString(item.unit, 'ml') as WaterUnit
       const amount = asNumber(item.amount) ?? 0
       return {
