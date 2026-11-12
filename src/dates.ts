@@ -64,8 +64,52 @@ export function isToday(iso: string): boolean {
   return iso === todayISO()
 }
 
-export function weekDates(endISO: string): string[] {
-  return Array.from({ length: 7 }, (_, i) => shiftDate(endISO, i - 6))
+export function mondayOf(iso: string): string {
+  const weekday = parseISODate(iso).getDay()
+  const delta = weekday === 0 ? -6 : 1 - weekday
+  return shiftDate(iso, delta)
+}
+
+export function dateRange(startISO: string, endISO: string): string[] {
+  if (endISO < startISO) return []
+  const days: string[] = []
+  for (let iso = startISO; iso <= endISO; iso = shiftDate(iso, 1)) {
+    days.push(iso)
+  }
+  return days
+}
+
+export function calendarWeek(iso: string): string[] {
+  const start = mondayOf(iso)
+  return dateRange(start, shiftDate(start, 6))
+}
+
+/** Monday of the week containing `iso`, through Sunday or today — whichever is earlier. */
+export function weekDates(iso: string, capISO = todayISO()): string[] {
+  const start = mondayOf(iso)
+  const sunday = shiftDate(start, 6)
+  const end = sunday < capISO ? sunday : capISO
+  return dateRange(start, end)
+}
+
+export function previousWeekDates(days: string[]): string[] {
+  return days.map((iso) => shiftDate(iso, -7))
+}
+
+export function formatWeekRange(days: string[]): string {
+  if (days.length === 0) return ''
+  if (days.length === 1) return formatLongDate(days[0])
+  const start = parseISODate(days[0]).toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+  })
+  const end = parseISODate(days[days.length - 1]).toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+  })
+  return `${start} – ${end}`
 }
 
 export function weekdayLabels(): string[] {

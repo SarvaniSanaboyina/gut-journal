@@ -200,7 +200,7 @@ select {
 
 .summary {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 10px;
   margin-bottom: 16px;
 }
@@ -589,6 +589,54 @@ input[type='range'] {
   font-size: 0.92rem;
 }
 
+.water-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: #e8f0f4;
+  border-radius: 14px;
+  color: #4d7388;
+  font-size: 0.88rem;
+}
+
+.water-total strong {
+  font-family: Fraunces, Georgia, serif;
+  font-size: 1.15rem;
+  font-weight: 650;
+  color: #3a5f73;
+}
+
+.form-grid > .water-total {
+  margin-top: 0;
+}
+
+.calorie-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: #eef4ee;
+  border-radius: 14px;
+  color: var(--sage);
+  font-size: 0.88rem;
+}
+
+.calorie-total strong {
+  font-family: Fraunces, Georgia, serif;
+  font-size: 1.15rem;
+  font-weight: 650;
+  color: var(--sage);
+}
+
+.form-grid > .calorie-total {
+  margin-top: 0;
+}
+
 .qty-row {
   display: grid;
   gap: 8px;
@@ -783,6 +831,11 @@ input[type='range'] {
   background: #eef4ee;
 }
 
+.day-card:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .day-card .wd { font-size: 0.7rem; color: var(--muted); }
 .day-card .dn {
   font-family: Fraunces, Georgia, serif;
@@ -959,7 +1012,8 @@ input[type='range'] {
 .blob { width: 10px; height: 8px; border-radius: 40% 60% 50% 50%; }
 .wave { width: 22px; height: 5px; border-radius: 4px; opacity: 0.7; }
 
-.mood-face {
+.mood-face,
+.water-drop {
   width: 28px;
   height: 28px;
 }
@@ -980,6 +1034,7 @@ input[type='range'] {
     max-height: 86dvh;
   }
   .choice-grid.bristol { grid-template-columns: 1fr 1fr; }
+  .summary { grid-template-columns: repeat(4, 1fr); }
 }
 
 @media (max-width: 640px) {

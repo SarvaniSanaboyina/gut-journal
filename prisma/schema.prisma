@@ -17,6 +17,7 @@ model Meal {
   quantityUnit       String    @map("quantity_unit")
   consistency        String
   consistencyPercent Int?      @map("consistency_percent")
+  calories           Float?
   notes              String    @default("")
   hasBeforePhoto     Boolean   @default(false) @map("has_before_photo")
   hasAfterPhoto      Boolean   @default(false) @map("has_after_photo")
@@ -53,6 +54,19 @@ model Mood {
 
   @@index([date, time], map: "moods_date_idx")
   @@map("moods")
+}
+
+model Water {
+  id        String   @id
+  date      String
+  time      String
+  amount    Float
+  unit      String
+  notes     String   @default("")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@index([date, time], map: "waters_date_idx")
+  @@map("waters")
 }
 
 model DayNote {

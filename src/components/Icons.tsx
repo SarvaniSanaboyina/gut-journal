@@ -57,6 +57,27 @@ export function StoolArt({ type }: { type: BristolType }) {
   return <span className="stool-art" aria-hidden="true"><i className="wave" /><i className="wave" /></span>
 }
 
+export function WaterDrop() {
+  return (
+    <svg className="water-drop" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M12 3.5C12 3.5 6.5 10.2 6.5 14.2a5.5 5.5 0 0 0 11 0C17.5 10.2 12 3.5 12 3.5Z"
+        fill="#d7e6ee"
+        stroke="#4d7388"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M10 14.5c.4 1.6 2.2 2.2 3.4 1.4"
+        fill="none"
+        stroke="#6e91a6"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 export function MoodFace({ mood }: { mood: MoodKind }) {
   const faces: Record<MoodKind, string> = {
     happy: 'M8 15c1.4 2 4.6 2 6 0 M7 9.5h.01M17 9.5h.01',

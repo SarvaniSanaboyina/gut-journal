@@ -11,19 +11,29 @@ import {
   todayISO,
   weekdayLabels,
 } from '../dates'
-import { formatConsistency, formatDuration, formatQuantity, mealDurationMinutes } from '../meals'
+import {
+  formatCalories,
+  formatConsistency,
+  formatDuration,
+  formatQuantity,
+  hasCalories,
+  mealDurationMinutes,
+  totalCalories,
+} from '../meals'
 import { parseImportedJournal } from '../storage'
-import type { JournalData, MealEntry, MoodEntry, PoopEntry } from '../types'
+import type { JournalData, MealEntry, MoodEntry, PoopEntry, WaterEntry } from '../types'
+import { formatTotalMl, formatWater, totalWaterMl } from '../water'
 import { Chevron } from './Icons'
 import { MealPhotoStrip } from './MealPhotos'
 
-type Filter = 'all' | 'meals' | 'poops' | 'moods'
+type Filter = 'all' | 'meals' | 'poops' | 'moods' | 'water'
 
 function datesWithEntries(data: JournalData) {
   const set = new Set<string>([
     ...data.meals.map((item) => item.date),
     ...data.poops.map((item) => item.date),
     ...data.moods.map((item) => item.date),
+    ...(data.waters ?? []).map((item) => item.date),
     ...Object.keys(data.dayNotes).filter((date) => data.dayNotes[date]?.trim()),
   ])
   return set
@@ -54,16 +64,17 @@ export function HistoryView({
   const current = parseISODate(today)
   const atCurrentMonth = month.year === current.getFullYear() && month.month === current.getMonth()
 
-  const meals = filter === 'poops' || filter === 'moods' ? [] : data.meals.filter((item) => item.date === selected)
-  const poops = filter === 'meals' || filter === 'moods' ? [] : data.poops.filter((item) => item.date === selected)
-  const moods = filter === 'meals' || filter === 'poops' ? [] : data.moods.filter((item) => item.date === selected)
+  const meals = filter === 'all' || filter === 'meals' ? data.meals.filter((item) => item.date === selected) : []
+  const poops = filter === 'all' || filter === 'poops' ? data.poops.filter((item) => item.date === selected) : []
+  const moods = filter === 'all' || filter === 'moods' ? data.moods.filter((item) => item.date === selected) : []
+  const waters = filter === 'all' || filter === 'water' ? (data.waters ?? []).filter((item) => item.date === selected) : []
   const note = filter === 'all' ? data.dayNotes[selected] : ''
-  const empty = !meals.length && !poops.length && !moods.length && !note?.trim()
+  const empty = !meals.length && !poops.length && !moods.length && !waters.length && !note?.trim()
 
   return (
     <>
       <div className="toolbar">
-        {(['all', 'meals', 'poops', 'moods'] as const).map((item) => (
+        {(['all', 'meals', 'poops', 'moods', 'water'] as const).map((item) => (
           <button
             key={item}
             onClick={() => setFilter(item)}
@@ -173,7 +184,7 @@ export function HistoryView({
         {empty ? (
           <div className="empty">Nothing logged on this day.</div>
         ) : (
-          <DayEntries meals={meals} poops={poops} moods={moods} note={note} />
+          <DayEntries meals={meals} poops={poops} moods={moods} waters={waters} note={note} />
         )}
       </section>
     </>
@@ -184,11 +195,13 @@ function DayEntries({
   meals,
   poops,
   moods,
+  waters,
   note,
 }: {
   meals: MealEntry[]
   poops: PoopEntry[]
   moods: MoodEntry[]
+  waters: WaterEntry[]
   note?: string
 }) {
   return (
@@ -198,6 +211,7 @@ function DayEntries({
         const bits = [
           entry.quantity != null ? formatQuantity(entry.quantity, entry.quantityUnit) : '',
           formatConsistency(entry.consistency, entry.consistencyPercent),
+          entry.calories != null ? formatCalories(entry.calories) : '',
           duration != null ? formatDuration(duration) : '',
           entry.notes,
         ].filter(Boolean)
@@ -222,6 +236,12 @@ function DayEntries({
           </div>
         )
       })}
+      {hasCalories(meals) && (
+        <div className="calorie-total">
+          <span>Total calorie consumption</span>
+          <strong>{formatCalories(totalCalories(meals))}</strong>
+        </div>
+      )}
       {poops.sort((a, b) => a.time.localeCompare(b.time)).map((entry) => (
         <div className="entry" key={entry.id}>
           <span className="badge">Poop {entry.bristol}</span>
@@ -242,6 +262,22 @@ function DayEntries({
           <span className="meta">{formatTime(entry.time)}</span>
         </div>
       ))}
+      {waters.sort((a, b) => a.time.localeCompare(b.time)).map((entry) => (
+        <div className="entry" key={entry.id}>
+          <span className="badge">Water</span>
+          <span>
+            <div className="title">{formatWater(entry.amount, entry.unit)}</div>
+            {entry.notes && <div className="detail">{entry.notes}</div>}
+          </span>
+          <span className="meta">{formatTime(entry.time)}</span>
+        </div>
+      ))}
+      {waters.length > 0 && (
+        <div className="water-total">
+          <span>Total water consumption</span>
+          <strong>{formatTotalMl(totalWaterMl(waters))}</strong>
+        </div>
+      )}
       {note?.trim() && (
         <div className="entry">
           <span className="badge">Note</span>

@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS meals (
   quantity_unit text NOT NULL,
   consistency text NOT NULL,
   consistency_percent integer,
+  calories double precision,
   notes text NOT NULL DEFAULT '',
   has_before_photo boolean NOT NULL DEFAULT false,
   has_after_photo boolean NOT NULL DEFAULT false,
@@ -45,6 +46,16 @@ CREATE TABLE IF NOT EXISTS moods (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS waters (
+  id text PRIMARY KEY,
+  date text NOT NULL,
+  time text NOT NULL,
+  amount double precision NOT NULL,
+  unit text NOT NULL,
+  notes text NOT NULL DEFAULT '',
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS day_notes (
   date text PRIMARY KEY,
   note text NOT NULL,
@@ -62,6 +73,9 @@ CREATE TABLE IF NOT EXISTS meal_photos (
 CREATE INDEX IF NOT EXISTS meals_date_idx ON meals (date, time);
 CREATE INDEX IF NOT EXISTS poops_date_idx ON poops (date, time);
 CREATE INDEX IF NOT EXISTS moods_date_idx ON moods (date, time);
+CREATE INDEX IF NOT EXISTS waters_date_idx ON waters (date, time);
+
+ALTER TABLE meals ADD COLUMN IF NOT EXISTS calories double precision;
 `
 
 export async function openDatabase(dataDir: string, databaseUrl = process.env.DATABASE_URL) {

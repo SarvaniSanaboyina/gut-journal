@@ -6,17 +6,19 @@ import { Modal } from './components/Modal'
 import { MoodForm } from './components/MoodForm'
 import { PoopForm } from './components/PoopForm'
 import { TodayView } from './components/TodayView'
+import { WaterForm } from './components/WaterForm'
 import { WeekView } from './components/WeekView'
 import { APP_NAME } from './constants'
 import { formatLongDate, isToday, shiftDate, todayISO } from './dates'
 import { useJournal } from './storage'
-import type { MealEntry, MoodEntry, PoopEntry } from './types'
+import type { MealEntry, MoodEntry, PoopEntry, WaterEntry } from './types'
 
 type View = 'today' | 'week' | 'history'
 type Editor =
   | { kind: 'meal'; entry?: MealEntry }
   | { kind: 'poop'; entry?: PoopEntry }
   | { kind: 'mood'; entry?: MoodEntry }
+  | { kind: 'water'; entry?: WaterEntry }
 
 async function persist(action: () => Promise<unknown>, onDone?: () => void) {
   try {
@@ -48,8 +50,8 @@ export default function App() {
           <div>
             <h1>{APP_NAME}</h1>
             <p>
-              <span className="tagline-long">Meals, poops, and mood — saved in a local PGlite database</span>
-              <span className="tagline-short">Meals, poops, and mood</span>
+              <span className="tagline-long">Meals, water, poops, and mood — saved in a local PGlite database</span>
+              <span className="tagline-short">Meals, water, poops, and mood</span>
             </p>
           </div>
         </div>
@@ -113,9 +115,11 @@ export default function App() {
           onAddMeal={() => setEditor({ kind: 'meal' })}
           onAddPoop={() => setEditor({ kind: 'poop' })}
           onAddMood={() => setEditor({ kind: 'mood' })}
+          onAddWater={() => setEditor({ kind: 'water' })}
           onEditMeal={(entry) => setEditor({ kind: 'meal', entry })}
           onEditPoop={(entry) => setEditor({ kind: 'poop', entry })}
           onEditMood={(entry) => setEditor({ kind: 'mood', entry })}
+          onEditWater={(entry) => setEditor({ kind: 'water', entry })}
           onNoteChange={(note) => journal.setDayNote(date, note)}
           onNoteBlur={() => journal.flushDayNote(date)}
         />
@@ -164,6 +168,7 @@ export default function App() {
           <MealForm
             date={date}
             initial={editor.entry}
+            logged={journal.data.meals.filter((item) => item.date === date)}
             onSave={(entry) => persist(() => journal.upsertMeal(entry), () => setEditor(null))}
             onDelete={
               editor.entry
@@ -214,6 +219,29 @@ export default function App() {
                 ? () => {
                     if (!window.confirm('Delete this mood log?')) return
                     void persist(() => journal.removeMood(editor.entry!.id), () => setEditor(null))
+                  }
+                : undefined
+            }
+            onCancel={() => setEditor(null)}
+          />
+        </Modal>
+      )}
+
+      {editor?.kind === 'water' && (
+        <Modal
+          title={editor.entry ? 'Edit water' : 'Log water'}
+          onClose={() => setEditor(null)}
+        >
+          <WaterForm
+            date={date}
+            initial={editor.entry}
+            logged={(journal.data.waters ?? []).filter((item) => item.date === date)}
+            onSave={(entry) => persist(() => journal.upsertWater(entry), () => setEditor(null))}
+            onDelete={
+              editor.entry
+                ? () => {
+                    if (!window.confirm('Delete this water log?')) return
+                    void persist(() => journal.removeWater(editor.entry!.id), () => setEditor(null))
                   }
                 : undefined
             }

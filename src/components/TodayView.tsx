@@ -1,8 +1,17 @@
 import { bristolMeta, mealLabel, moodMeta, stoolColorMeta } from '../constants'
 import { formatTime } from '../dates'
-import { formatConsistency, formatDuration, formatQuantity, mealDurationMinutes } from '../meals'
-import type { JournalData, MealEntry, MoodEntry, PoopEntry } from '../types'
-import { MoodFace, StoolArt } from './Icons'
+import {
+  formatCalories,
+  formatConsistency,
+  formatDuration,
+  formatQuantity,
+  hasCalories,
+  mealDurationMinutes,
+  totalCalories,
+} from '../meals'
+import type { JournalData, MealEntry, MoodEntry, PoopEntry, WaterEntry } from '../types'
+import { formatTotalMl, formatWater, totalWaterMl } from '../water'
+import { MoodFace, StoolArt, WaterDrop } from './Icons'
 import { MealPhotoStrip } from './MealPhotos'
 
 function byTime<T extends { time: string }>(items: T[]) {
@@ -15,9 +24,11 @@ export function TodayView({
   onAddMeal,
   onAddPoop,
   onAddMood,
+  onAddWater,
   onEditMeal,
   onEditPoop,
   onEditMood,
+  onEditWater,
   onNoteChange,
   onNoteBlur,
 }: {
@@ -26,16 +37,22 @@ export function TodayView({
   onAddMeal: () => void
   onAddPoop: () => void
   onAddMood: () => void
+  onAddWater: () => void
   onEditMeal: (entry: MealEntry) => void
   onEditPoop: (entry: PoopEntry) => void
   onEditMood: (entry: MoodEntry) => void
+  onEditWater: (entry: WaterEntry) => void
   onNoteChange: (note: string) => void
   onNoteBlur: () => void
 }) {
   const meals = byTime(data.meals.filter((item) => item.date === date))
   const poops = byTime(data.poops.filter((item) => item.date === date))
   const moods = byTime(data.moods.filter((item) => item.date === date))
+  const waters = byTime((data.waters ?? []).filter((item) => item.date === date))
   const latestMood = moods.at(-1)
+  const waterTotal = totalWaterMl(waters)
+  const calorieTotal = totalCalories(meals)
+  const caloriesLogged = hasCalories(meals)
   const poopSummary = poops.length === 1
     ? `Type ${poops[0].bristol}`
     : poops.length > 1
@@ -48,6 +65,10 @@ export function TodayView({
         <div className="summary-card">
           <span>Meals</span>
           <strong>{meals.length || '—'}</strong>
+        </div>
+        <div className="summary-card">
+          <span>Water</span>
+          <strong>{waters.length ? formatTotalMl(waterTotal) : '—'}</strong>
         </div>
         <div className="summary-card">
           <span>Poops</span>
@@ -63,44 +84,89 @@ export function TodayView({
         <div className="section-head">
           <div>
             <h3>Meals & snacks</h3>
-            <p>Breakfast through dinner, plus snacks</p>
+            <p>
+              {caloriesLogged
+                ? `${formatCalories(calorieTotal)} today`
+                : 'Breakfast through dinner, plus snacks'}
+            </p>
           </div>
           <button className="add-btn" onClick={onAddMeal}>+ Add</button>
         </div>
         {meals.length === 0 ? (
           <div className="empty">Nothing logged yet. Add what Ashrit ate today.</div>
         ) : (
-          <div className="entry-list">
-            {meals.map((entry) => {
-              const duration = mealDurationMinutes(entry)
-              const bits = [
-                entry.quantity != null ? formatQuantity(entry.quantity, entry.quantityUnit) : '',
-                formatConsistency(entry.consistency, entry.consistencyPercent),
-                duration != null ? formatDuration(duration) : '',
-                entry.notes,
-              ].filter(Boolean)
-              return (
-                <div key={entry.id} className="entry meal-card">
-                  <button className="entry-body" onClick={() => onEditMeal(entry)}>
-                    <span className="badge">{mealLabel(entry.type)}</span>
-                    <span>
-                      <div className="title">{entry.foods}</div>
-                      {bits.length > 0 && <div className="detail">{bits.join(' · ')}</div>}
-                    </span>
-                    <span className="meta">
-                      {formatTime(entry.time)}
-                      {entry.endTime ? ` – ${formatTime(entry.endTime)}` : ''}
-                    </span>
-                  </button>
-                  <MealPhotoStrip
-                    mealId={entry.id}
-                    before={entry.hasBeforePhoto}
-                    after={entry.hasAfterPhoto}
-                  />
-                </div>
-              )
-            })}
+          <>
+            <div className="entry-list">
+              {meals.map((entry) => {
+                const duration = mealDurationMinutes(entry)
+                const bits = [
+                  entry.quantity != null ? formatQuantity(entry.quantity, entry.quantityUnit) : '',
+                  formatConsistency(entry.consistency, entry.consistencyPercent),
+                  entry.calories != null ? formatCalories(entry.calories) : '',
+                  duration != null ? formatDuration(duration) : '',
+                  entry.notes,
+                ].filter(Boolean)
+                return (
+                  <div key={entry.id} className="entry meal-card">
+                    <button className="entry-body" onClick={() => onEditMeal(entry)}>
+                      <span className="badge">{mealLabel(entry.type)}</span>
+                      <span>
+                        <div className="title">{entry.foods}</div>
+                        {bits.length > 0 && <div className="detail">{bits.join(' · ')}</div>}
+                      </span>
+                      <span className="meta">
+                        {formatTime(entry.time)}
+                        {entry.endTime ? ` – ${formatTime(entry.endTime)}` : ''}
+                      </span>
+                    </button>
+                    <MealPhotoStrip
+                      mealId={entry.id}
+                      before={entry.hasBeforePhoto}
+                      after={entry.hasAfterPhoto}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+            {caloriesLogged && (
+              <div className="calorie-total">
+                <span>Total calorie consumption</span>
+                <strong>{formatCalories(calorieTotal)}</strong>
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      <section className="section">
+        <div className="section-head">
+          <div>
+            <h3>Water</h3>
+            <p>{waters.length ? `${formatTotalMl(waterTotal)} today` : 'Sips, cups, and bottles through the day'}</p>
           </div>
+          <button className="add-btn" onClick={onAddWater}>+ Add</button>
+        </div>
+        {waters.length === 0 ? (
+          <div className="empty">No water logged yet. Add a drink when he has one.</div>
+        ) : (
+          <>
+            <div className="entry-list">
+              {waters.map((entry) => (
+                <button key={entry.id} className="entry" onClick={() => onEditWater(entry)}>
+                  <WaterDrop />
+                  <span>
+                    <div className="title">{formatWater(entry.amount, entry.unit)}</div>
+                    {entry.notes && <div className="detail">{entry.notes}</div>}
+                  </span>
+                  <span className="meta">{formatTime(entry.time)}</span>
+                </button>
+              ))}
+            </div>
+            <div className="water-total">
+              <span>Total water consumption</span>
+              <strong>{formatTotalMl(waterTotal)}</strong>
+            </div>
+          </>
         )}
       </section>
 

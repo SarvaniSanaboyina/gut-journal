@@ -1,4 +1,4 @@
-import type { Meal, Mood, Poop, Prisma, PrismaClient } from '@prisma/client'
+import type { Meal, Mood, Poop, Prisma, PrismaClient, Water } from '@prisma/client'
 
 export class HttpError extends Error {
   status: number
@@ -24,6 +24,7 @@ const QUANTITY_UNITS = ['bites', 'spoons', 'pieces', 'bowls', 'cups', 'ml'] as c
 const COLORS = ['brown', 'yellow', 'green', 'black', 'red', 'pale', 'other'] as const
 const AMOUNTS = ['small', 'medium', 'large'] as const
 const MOODS = ['happy', 'calm', 'fussy', 'tired', 'irritable', 'energetic', 'tummy'] as const
+const WATER_UNITS = ['ml', 'sips', 'cups'] as const
 const PHOTO_SLOTS = ['before', 'after'] as const
 
 export type PhotoSlot = (typeof PHOTO_SLOTS)[number]
@@ -39,6 +40,7 @@ export type MealEntry = {
   quantityUnit: (typeof QUANTITY_UNITS)[number]
   consistency: (typeof CONSISTENCIES)[number]
   consistencyPercent: number | null
+  calories: number | null
   notes: string
   hasBeforePhoto: boolean
   hasAfterPhoto: boolean
@@ -65,10 +67,20 @@ export type MoodEntry = {
   notes: string
 }
 
+export type WaterEntry = {
+  id: string
+  date: string
+  time: string
+  amount: number
+  unit: (typeof WATER_UNITS)[number]
+  notes: string
+}
+
 export type JournalData = {
   meals: MealEntry[]
   poops: PoopEntry[]
   moods: MoodEntry[]
+  waters: WaterEntry[]
   dayNotes: Record<string, string>
 }
 
@@ -165,6 +177,7 @@ function mealFromRow(row: Meal): MealEntry {
     quantityUnit: row.quantityUnit as MealEntry['quantityUnit'],
     consistency: row.consistency as MealEntry['consistency'],
     consistencyPercent: row.consistencyPercent == null ? null : Number(row.consistencyPercent),
+    calories: row.calories == null ? null : Number(row.calories),
     notes: row.notes,
     hasBeforePhoto: row.hasBeforePhoto === true,
     hasAfterPhoto: row.hasAfterPhoto === true,
@@ -192,6 +205,17 @@ function moodFromRow(row: Mood): MoodEntry {
     date: row.date,
     time: row.time,
     mood: row.mood as MoodEntry['mood'],
+    notes: row.notes,
+  }
+}
+
+function waterFromRow(row: Water): WaterEntry {
+  return {
+    id: row.id,
+    date: row.date,
+    time: row.time,
+    amount: Number(row.amount),
+    unit: row.unit as WaterEntry['unit'],
     notes: row.notes,
   }
 }
@@ -226,6 +250,7 @@ function parseMeal(value: unknown, looseType = false): MealEntry {
       consistency === 'semi-solid' && percent != null
         ? Math.min(100, Math.max(0, Math.round(percent)))
         : null,
+    calories: parseQuantity(value.calories),
     notes: parseText(value.notes, MAX_TEXT),
     hasBeforePhoto: parseFlag(value.hasBeforePhoto),
     hasAfterPhoto: parseFlag(value.hasAfterPhoto),
@@ -257,6 +282,20 @@ function parseMood(value: unknown, loose = false): MoodEntry {
     date: parseDate(value.date),
     time: parseTime(value.time),
     mood: oneOf(typeof value.mood === 'string' ? value.mood : 'calm', MOODS, 'mood'),
+    notes: parseText(value.notes, MAX_TEXT),
+  }
+}
+
+function parseWater(value: unknown, loose = false): WaterEntry {
+  if (!isRecord(value)) return bad('Invalid water log')
+  const amount = parseQuantity(value.amount)
+  if (amount == null || amount <= 0) return bad('A water log needs an amount')
+  return {
+    id: parseId(value.id, loose),
+    date: parseDate(value.date),
+    time: parseTime(value.time),
+    amount,
+    unit: oneOf(typeof value.unit === 'string' ? value.unit : 'ml', WATER_UNITS, 'water unit'),
     notes: parseText(value.notes, MAX_TEXT),
   }
 }
@@ -293,6 +332,7 @@ async function insertMeal(db: Db, meal: MealEntry) {
     quantityUnit: meal.quantityUnit,
     consistency: meal.consistency,
     consistencyPercent: meal.consistencyPercent,
+    calories: meal.calories,
     notes: meal.notes,
     hasBeforePhoto: meal.hasBeforePhoto,
     hasAfterPhoto: meal.hasAfterPhoto,
@@ -310,6 +350,7 @@ async function insertMeal(db: Db, meal: MealEntry) {
       quantityUnit: data.quantityUnit,
       consistency: data.consistency,
       consistencyPercent: data.consistencyPercent,
+      calories: data.calories,
       notes: data.notes,
       hasBeforePhoto: data.hasBeforePhoto,
       hasAfterPhoto: data.hasAfterPhoto,
@@ -367,6 +408,28 @@ async function insertMood(db: Db, entry: MoodEntry) {
   })
 }
 
+async function insertWater(db: Db, entry: WaterEntry) {
+  const data = {
+    id: entry.id,
+    date: entry.date,
+    time: entry.time,
+    amount: entry.amount,
+    unit: entry.unit,
+    notes: entry.notes,
+  }
+  await db.water.upsert({
+    where: { id: entry.id },
+    create: data,
+    update: {
+      date: data.date,
+      time: data.time,
+      amount: data.amount,
+      unit: data.unit,
+      notes: data.notes,
+    },
+  })
+}
+
 async function insertPhoto(db: Db, mealId: string, slot: PhotoSlot, mime: string, bytes: Uint8Array) {
   const payload = Buffer.from(bytes)
   await db.mealPhoto.upsert({
@@ -382,10 +445,11 @@ async function insertPhoto(db: Db, mealId: string, slot: PhotoSlot, mime: string
 }
 
 export async function readJournal(db: PrismaClient): Promise<JournalData> {
-  const [meals, poops, moods, notes] = await Promise.all([
+  const [meals, poops, moods, waters, notes] = await Promise.all([
     db.meal.findMany({ orderBy: [{ date: 'asc' }, { time: 'asc' }, { id: 'asc' }] }),
     db.poop.findMany({ orderBy: [{ date: 'asc' }, { time: 'asc' }, { id: 'asc' }] }),
     db.mood.findMany({ orderBy: [{ date: 'asc' }, { time: 'asc' }, { id: 'asc' }] }),
+    db.water.findMany({ orderBy: [{ date: 'asc' }, { time: 'asc' }, { id: 'asc' }] }),
     db.dayNote.findMany({ orderBy: { date: 'asc' } }),
   ])
   const dayNotes: Record<string, string> = {}
@@ -394,6 +458,7 @@ export async function readJournal(db: PrismaClient): Promise<JournalData> {
     meals: meals.map(mealFromRow),
     poops: poops.map(poopFromRow),
     moods: moods.map(moodFromRow),
+    waters: waters.map(waterFromRow),
     dayNotes,
   }
 }
@@ -430,6 +495,16 @@ export async function saveMood(db: PrismaClient, body: unknown) {
 
 export async function removeMood(db: PrismaClient, id: string) {
   await db.mood.deleteMany({ where: { id: parseId(id) } })
+}
+
+export async function saveWater(db: PrismaClient, body: unknown) {
+  const entry = parseWater(body)
+  await insertWater(db, entry)
+  return entry
+}
+
+export async function removeWater(db: PrismaClient, id: string) {
+  await db.water.deleteMany({ where: { id: parseId(id) } })
 }
 
 export async function saveDayNote(db: PrismaClient, dateValue: string, body: unknown) {
@@ -498,7 +573,13 @@ export async function importJournal(db: PrismaClient, body: unknown): Promise<Jo
   const mealsRaw = Array.isArray(body.meals) ? body.meals : []
   const poopsRaw = Array.isArray(body.poops) ? body.poops : []
   const moodsRaw = Array.isArray(body.moods) ? body.moods : []
-  if (mealsRaw.length > MAX_ENTRIES || poopsRaw.length > MAX_ENTRIES || moodsRaw.length > MAX_ENTRIES) {
+  const watersRaw = Array.isArray(body.waters) ? body.waters : []
+  if (
+    mealsRaw.length > MAX_ENTRIES ||
+    poopsRaw.length > MAX_ENTRIES ||
+    moodsRaw.length > MAX_ENTRIES ||
+    watersRaw.length > MAX_ENTRIES
+  ) {
     return bad('Backup has too many entries')
   }
 
@@ -515,6 +596,7 @@ export async function importJournal(db: PrismaClient, body: unknown): Promise<Jo
   })
   const poops = poopsRaw.map((item) => parsePoop(item, true))
   const moods = moodsRaw.map((item) => parseMood(item, true))
+  const waters = watersRaw.map((item) => parseWater(item, true))
   const dayNotes: Record<string, string> = {}
   if (isRecord(body.dayNotes)) {
     for (const [date, note] of Object.entries(body.dayNotes)) {
@@ -530,10 +612,12 @@ export async function importJournal(db: PrismaClient, body: unknown): Promise<Jo
     await tx.meal.deleteMany()
     await tx.poop.deleteMany()
     await tx.mood.deleteMany()
+    await tx.water.deleteMany()
     await tx.dayNote.deleteMany()
     for (const meal of meals) await insertMeal(tx, meal)
     for (const entry of poops) await insertPoop(tx, entry)
     for (const entry of moods) await insertMood(tx, entry)
+    for (const entry of waters) await insertWater(tx, entry)
     for (const [date, note] of Object.entries(dayNotes)) {
       await tx.dayNote.create({ data: { date, note } })
     }

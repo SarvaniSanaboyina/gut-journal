@@ -1,4 +1,4 @@
-import type { JournalData, MealEntry, MoodEntry, PoopEntry } from './types'
+import type { JournalData, MealEntry, MoodEntry, PoopEntry, WaterEntry } from './types'
 
 type PhotoSlot = 'before' | 'after'
 
@@ -57,6 +57,10 @@ export function upsertMood(entry: MoodEntry) {
   return sendJson<MoodEntry>('/api/moods', putJson(entry))
 }
 
+export function upsertWater(entry: WaterEntry) {
+  return sendJson<WaterEntry>('/api/waters', putJson(entry))
+}
+
 export async function deleteMeal(id: string) {
   await send(`/api/meals/${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
@@ -67,6 +71,10 @@ export async function deletePoop(id: string) {
 
 export async function deleteMood(id: string) {
   await send(`/api/moods/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export async function deleteWater(id: string) {
+  await send(`/api/waters/${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
 export async function setNote(date: string, note: string) {

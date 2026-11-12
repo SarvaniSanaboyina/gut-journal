@@ -1,7 +1,8 @@
 import { bristolMeta, moodMeta } from '../constants'
-import { formatLongDate, weekDates } from '../dates'
+import { calendarWeek, formatLongDate, formatWeekRange, todayISO, weekDates } from '../dates'
 import { buildWeeklyReport, formatDuration } from '../meals'
 import type { JournalData } from '../types'
+import { formatTotalMl, weekWater } from '../water'
 
 function TrendMark({ trend }: { trend: 'up' | 'down' | 'same' | 'unknown' }) {
   if (trend === 'up') return <span className="trend up">Increased</span>
@@ -19,10 +20,14 @@ export function WeekView({
   data: JournalData
   onSelectDate: (iso: string) => void
 }) {
+  const today = todayISO()
+  const strip = calendarWeek(date)
   const days = weekDates(date)
   const report = buildWeeklyReport(data, date)
   const weekPoops = data.poops.filter((item) => days.includes(item.date))
   const weekMoods = data.moods.filter((item) => days.includes(item.date))
+  const water = weekWater(data, days)
+  const midWeek = days.length < 7
 
   const bristolCounts = weekPoops.reduce<Record<number, number>>((acc, item) => {
     acc[item.bristol] = (acc[item.bristol] ?? 0) + 1
@@ -39,21 +44,25 @@ export function WeekView({
   return (
     <>
       <div className="week-grid">
-        {days.map((iso) => {
+        {strip.map((iso) => {
           const poops = data.poops.filter((item) => item.date === iso)
           const moods = data.moods.filter((item) => item.date === iso)
           const meals = data.meals.filter((item) => item.date === iso)
+          const waters = (data.waters ?? []).filter((item) => item.date === iso)
           const day = new Date(`${iso}T12:00:00`)
+          const future = iso > today
           return (
             <button
               key={iso}
               className={`day-card ${iso === date ? 'selected' : ''}`}
+              disabled={future}
               onClick={() => onSelectDate(iso)}
             >
               <div className="wd">{day.toLocaleDateString(undefined, { weekday: 'short' })}</div>
               <div className="dn">{day.getDate()}</div>
               <div className="dots">
                 {meals.length > 0 && <i className="dot" style={{ background: '#5c7a68' }} />}
+                {waters.length > 0 && <i className="dot" style={{ background: '#6e91a6' }} />}
                 {poops.length > 0 && <i className="dot" style={{ background: '#8b5a2b' }} />}
                 {moods.length > 0 && <i className="dot" style={{ background: '#c45b38' }} />}
               </div>
@@ -66,7 +75,12 @@ export function WeekView({
         <div className="section-head">
           <div>
             <h3>Weekly report</h3>
-            <p>Compared with the previous 7 days, ending {formatLongDate(date)}</p>
+            <p>
+              {formatWeekRange(days)}
+              {midWeek
+                ? ' — compared with the same days last week'
+                : ' — compared with last week'}
+            </p>
           </div>
         </div>
         <div className="report-cards">
@@ -79,6 +93,11 @@ export function WeekView({
             <span>Meal time</span>
             <TrendMark trend={report.mealTime.trend} />
             <p>{report.mealTime.label}</p>
+          </article>
+          <article className="report-card">
+            <span>Water intake</span>
+            <TrendMark trend={report.water.trend} />
+            <p>{report.water.label}</p>
           </article>
         </div>
         <div className="insight">
@@ -103,7 +122,7 @@ export function WeekView({
         <div className="section-head">
           <div>
             <h3>Other observations</h3>
-            <p>Patterns from meals, poops, and mood this week</p>
+            <p>Patterns from meals, water, poops, and mood this week</p>
           </div>
         </div>
         <ul className="observations">
@@ -117,7 +136,7 @@ export function WeekView({
         <div className="section-head">
           <div>
             <h3>This week</h3>
-            <p>Poop and mood at a glance</p>
+            <p>Poop, mood, and water at a glance</p>
           </div>
         </div>
         <div className="insight">
@@ -139,6 +158,14 @@ export function WeekView({
               {commonMood ? moodMeta(commonMood[0] as Parameters<typeof moodMeta>[0]).label : '—'}
             </strong>
           </div>
+          <div className="row">
+            <span>Water logged</span>
+            <strong>
+              {water.count
+                ? `${formatTotalMl(water.totalMl)} across ${water.daysWithWater} day${water.daysWithWater === 1 ? '' : 's'}`
+                : '—'}
+            </strong>
+          </div>
         </div>
       </section>
 
@@ -150,13 +177,15 @@ export function WeekView({
           </div>
         </div>
         <div className="insight">
-          {(['meals', 'poops', 'moods'] as const).map((kind) => {
+          {(['meals', 'water', 'poops', 'moods'] as const).map((kind) => {
             const count =
               kind === 'meals'
                 ? data.meals.filter((item) => item.date === date).length
-                : kind === 'poops'
-                  ? data.poops.filter((item) => item.date === date).length
-                  : data.moods.filter((item) => item.date === date).length
+                : kind === 'water'
+                  ? (data.waters ?? []).filter((item) => item.date === date).length
+                  : kind === 'poops'
+                    ? data.poops.filter((item) => item.date === date).length
+                    : data.moods.filter((item) => item.date === date).length
             return (
               <div className="row" key={kind}>
                 <span>{kind[0].toUpperCase() + kind.slice(1)}</span>

@@ -3,6 +3,7 @@ import {
   deleteMeal,
   deleteMood,
   deletePoop,
+  deleteWater,
   downloadExport,
   getJournal,
   importJournal,
@@ -11,6 +12,7 @@ import {
   upsertMeal as saveMeal,
   upsertMood as saveMood,
   upsertPoop as savePoop,
+  upsertWater as saveWater,
 } from './api'
 import { attachLegacyPhotos, clearLegacyPhotos } from './legacy'
 import { migrateMealType } from './meals'
@@ -22,6 +24,8 @@ import type {
   MoodEntry,
   PoopEntry,
   QuantityUnit,
+  WaterEntry,
+  WaterUnit,
 } from './types'
 import { emptyJournal } from './types'
 
@@ -67,6 +71,7 @@ function normalize(raw: unknown): JournalData {
         quantityUnit: (asString(item.quantityUnit, 'spoons') as QuantityUnit),
         consistency: ['solid', 'semi-solid', 'liquid'].includes(consistency) ? consistency : 'solid',
         consistencyPercent: consistency === 'semi-solid' ? percent : null,
+        calories: asNumber(item.calories),
         notes: asString(item.notes),
         hasBeforePhoto: asBoolean(item.hasBeforePhoto) || Boolean(item.photoBefore),
         hasAfterPhoto: asBoolean(item.hasAfterPhoto) || Boolean(item.photoAfter),
@@ -99,6 +104,21 @@ function normalize(raw: unknown): JournalData {
     }))
   }
 
+  if (Array.isArray(raw.waters)) {
+    data.waters = raw.waters.filter(isRecord).map((item) => {
+      const unit = asString(item.unit, 'ml') as WaterUnit
+      const amount = asNumber(item.amount) ?? 0
+      return {
+        id: asString(item.id, crypto.randomUUID()),
+        date: asString(item.date),
+        time: asString(item.time, '12:00'),
+        amount,
+        unit: unit === 'sips' || unit === 'cups' ? unit : 'ml',
+        notes: asString(item.notes),
+      }
+    }).filter((item) => item.amount > 0)
+  }
+
   if (isRecord(raw.dayNotes)) {
     for (const [date, note] of Object.entries(raw.dayNotes)) {
       if (typeof note === 'string') data.dayNotes[date] = note
@@ -123,6 +143,7 @@ function isEmpty(data: JournalData) {
     data.meals.length === 0 &&
     data.poops.length === 0 &&
     data.moods.length === 0 &&
+    data.waters.length === 0 &&
     !Object.values(data.dayNotes).some((note) => note.trim())
   )
 }
@@ -164,7 +185,7 @@ export function useJournal() {
 
   const remember = useCallback((next: JournalData) => {
     notesRef.current = next.dayNotes
-    setData(next)
+    setData({ ...next, waters: next.waters ?? [] })
   }, [])
 
   useEffect(() => {
@@ -228,6 +249,14 @@ export function useJournal() {
     }))
   }, [])
 
+  const upsertWater = useCallback(async (entry: WaterEntry) => {
+    const saved = await saveWater(entry)
+    setData((prev) => ({
+      ...prev,
+      waters: [...(prev.waters ?? []).filter((item) => item.id !== saved.id), saved],
+    }))
+  }, [])
+
   const removeMeal = useCallback(async (id: string) => {
     await deleteMeal(id)
     setData((prev) => ({ ...prev, meals: prev.meals.filter((item) => item.id !== id) }))
@@ -242,6 +271,11 @@ export function useJournal() {
   const removeMood = useCallback(async (id: string) => {
     await deleteMood(id)
     setData((prev) => ({ ...prev, moods: prev.moods.filter((item) => item.id !== id) }))
+  }, [])
+
+  const removeWater = useCallback(async (id: string) => {
+    await deleteWater(id)
+    setData((prev) => ({ ...prev, waters: (prev.waters ?? []).filter((item) => item.id !== id) }))
   }, [])
 
   const setDayNote = useCallback((date: string, note: string) => {
@@ -294,9 +328,11 @@ export function useJournal() {
     upsertMeal,
     upsertPoop,
     upsertMood,
+    upsertWater,
     removeMeal,
     removePoop,
     removeMood,
+    removeWater,
     setDayNote,
     flushDayNote,
     importBackup,

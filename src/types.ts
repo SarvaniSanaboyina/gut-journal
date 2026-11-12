@@ -21,6 +21,7 @@ export interface MealEntry {
   quantityUnit: QuantityUnit
   consistency: MealConsistency
   consistencyPercent: number | null
+  calories: number | null
   notes: string
   hasBeforePhoto: boolean
   hasAfterPhoto: boolean
@@ -69,10 +70,22 @@ export interface MoodEntry {
   notes: string
 }
 
+export type WaterUnit = 'ml' | 'sips' | 'cups'
+
+export interface WaterEntry {
+  id: string
+  date: string
+  time: string
+  amount: number
+  unit: WaterUnit
+  notes: string
+}
+
 export interface JournalData {
   meals: MealEntry[]
   poops: PoopEntry[]
   moods: MoodEntry[]
+  waters: WaterEntry[]
   dayNotes: Record<string, string>
 }
 
@@ -80,5 +93,6 @@ export const emptyJournal = (): JournalData => ({
   meals: [],
   poops: [],
   moods: [],
+  waters: [],
   dayNotes: {},
 })

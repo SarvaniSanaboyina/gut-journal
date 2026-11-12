@@ -14,11 +14,13 @@ import {
   removeMood,
   removePhoto,
   removePoop,
+  removeWater,
   saveDayNote,
   saveMeal,
   saveMood,
   savePhoto,
   savePoop,
+  saveWater,
 } from './journal.ts'
 
 const JSON_LIMIT = '32mb'
@@ -122,6 +124,10 @@ export function createApp(prisma: PrismaClient, options: { distDir?: string } = 
     res.json(await saveMood(prisma, req.body))
   })
 
+  app.put('/api/waters', async (req, res) => {
+    res.json(await saveWater(prisma, req.body))
+  })
+
   app.delete('/api/meals/:id', async (req, res) => {
     await removeMeal(prisma, param(req.params.id))
     res.status(204).end()
@@ -134,6 +140,11 @@ export function createApp(prisma: PrismaClient, options: { distDir?: string } = 
 
   app.delete('/api/moods/:id', async (req, res) => {
     await removeMood(prisma, param(req.params.id))
+    res.status(204).end()
+  })
+
+  app.delete('/api/waters/:id', async (req, res) => {
+    await removeWater(prisma, param(req.params.id))
     res.status(204).end()
   })
 

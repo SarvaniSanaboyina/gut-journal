@@ -1,5 +1,5 @@
 import { mealLabel } from './constants'
-import { shiftDate, weekDates } from './dates'
+import { previousWeekDates, weekDates } from './dates'
 import type {
   JournalData,
   MealConsistency,
@@ -7,6 +7,7 @@ import type {
   MealType,
   QuantityUnit,
 } from './types'
+import { formatTotalMl, weekWater } from './water'
 
 const MEAL_TYPES: MealType[] = [
   'breakfast',
@@ -48,6 +49,19 @@ export function formatDuration(minutes: number): string {
 export function formatQuantity(quantity: number, unit: QuantityUnit): string {
   const rounded = Number.isInteger(quantity) ? String(quantity) : quantity.toFixed(1)
   return `${rounded} ${unit}`
+}
+
+export function formatCalories(kcal: number): string {
+  const rounded = Number.isInteger(kcal) ? String(kcal) : String(Math.round(kcal * 10) / 10)
+  return `${rounded} kcal`
+}
+
+export function totalCalories(meals: MealEntry[]): number {
+  return meals.reduce((sum, item) => sum + (item.calories ?? 0), 0)
+}
+
+export function hasCalories(meals: MealEntry[]): boolean {
+  return meals.some((item) => item.calories != null)
 }
 
 export function formatConsistency(consistency: MealConsistency, percent: number | null): string {
@@ -165,6 +179,15 @@ export type WeeklyReport = {
     lastAvg: number | null
     label: string
   }
+  water: {
+    trend: 'up' | 'down' | 'same' | 'unknown'
+    change: number | null
+    thisTotal: number
+    lastTotal: number
+    count: number
+    daysWithWater: number
+    label: string
+  }
   observations: string[]
 }
 
@@ -176,7 +199,7 @@ function formatSignedPercent(change: number): string {
 
 export function buildWeeklyReport(data: JournalData, endISO: string): WeeklyReport {
   const thisDays = weekDates(endISO)
-  const lastDays = weekDates(shiftDate(endISO, -7))
+  const lastDays = previousWeekDates(thisDays)
   const thisWeek = sliceWeek(data, thisDays)
   const lastWeek = sliceWeek(data, lastDays)
 
@@ -199,6 +222,23 @@ export function buildWeeklyReport(data: JournalData, endISO: string): WeeklyRepo
     thisWeek.avgDuration != null && lastWeek.avgDuration != null
       ? percentChange(thisWeek.avgDuration, lastWeek.avgDuration)
       : null
+  const thisWater = weekWater(data, thisDays)
+  const lastWater = weekWater(data, lastDays)
+  const waterChange = thisWater.count && lastWater.count
+    ? percentChange(thisWater.totalMl, lastWater.totalMl)
+    : null
+  const waterTrend = trendWord(waterChange)
+  const waterLabel =
+    waterTrend === 'unknown'
+      ? thisWater.count
+        ? 'Log water for another week to compare drinks.'
+        : 'Add water logs to track how much he drinks.'
+      : waterTrend === 'up'
+        ? `Water intake increased by about ${formatSignedPercent(waterChange!)} vs last week.`
+        : waterTrend === 'down'
+          ? `Water intake decreased by about ${formatSignedPercent(waterChange!)} vs last week.`
+          : 'Water intake stayed about the same as last week.'
+
   const timeTrend = trendWord(timeChange)
   const mealTimeLabel =
     timeTrend === 'unknown'
@@ -277,6 +317,14 @@ export function buildWeeklyReport(data: JournalData, endISO: string): WeeklyRepo
     if (diff <= -20) observations.push('Breakfast started earlier than last week.')
   }
 
+  if (thisWater.count === 0) {
+    observations.push('No water logged this week yet.')
+  } else {
+    observations.push(
+      `${thisWater.count} drink${thisWater.count === 1 ? '' : 's'} totaling ${formatTotalMl(thisWater.totalMl)} across ${thisWater.daysWithWater} day${thisWater.daysWithWater === 1 ? '' : 's'}.`,
+    )
+  }
+
   const weekPoops = data.poops.filter((item) => thisDays.includes(item.date))
   const loose = weekPoops.filter((item) => item.bristol >= 6).length
   if (loose >= 2 && liquids > solids) {
@@ -285,6 +333,9 @@ export function buildWeeklyReport(data: JournalData, endISO: string): WeeklyRepo
   const hard = weekPoops.filter((item) => item.bristol <= 2).length
   if (hard >= 2 && solids > liquids) {
     observations.push('Harder stools showed up in a week with more solids.')
+  }
+  if (hard >= 2 && thisWater.count > 0 && thisWater.daysWithWater <= Math.max(1, Math.floor(thisDays.length / 2))) {
+    observations.push('Harder stools showed up in a week with little water logged.')
   }
 
   const weekMoods = data.moods.filter((item) => thisDays.includes(item.date))
@@ -309,6 +360,15 @@ export function buildWeeklyReport(data: JournalData, endISO: string): WeeklyRepo
       thisAvg: thisWeek.avgDuration,
       lastAvg: lastWeek.avgDuration,
       label: mealTimeLabel,
+    },
+    water: {
+      trend: waterTrend,
+      change: waterChange,
+      thisTotal: thisWater.totalMl,
+      lastTotal: lastWater.totalMl,
+      count: thisWater.count,
+      daysWithWater: thisWater.daysWithWater,
+      label: waterLabel,
     },
     observations,
   }

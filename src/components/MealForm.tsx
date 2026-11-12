@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { MEAL_CONSISTENCIES, MEAL_TYPES, QUANTITY_UNITS } from '../constants'
 import { defaultMealType, nowTime } from '../dates'
-import { formatDuration, mealDurationMinutes } from '../meals'
+import { formatCalories, formatDuration, mealDurationMinutes, totalCalories } from '../meals'
 import { compressImage, deletePhoto, putPhoto } from '../photos'
 import type { MealConsistency, MealEntry, MealType, QuantityUnit } from '../types'
 import { PhotoSlot } from './MealPhotos'
@@ -13,12 +13,14 @@ function defaultUnit(consistency: MealConsistency): QuantityUnit {
 export function MealForm({
   date,
   initial,
+  logged = [],
   onSave,
   onDelete,
   onCancel,
 }: {
   date: string
   initial?: MealEntry
+  logged?: MealEntry[]
   onSave: (entry: MealEntry) => void | Promise<void>
   onDelete?: () => void
   onCancel: () => void
@@ -31,6 +33,7 @@ export function MealForm({
   const [quantityUnit, setQuantityUnit] = useState<QuantityUnit>(initial?.quantityUnit ?? 'spoons')
   const [consistency, setConsistency] = useState<MealConsistency>(initial?.consistency ?? 'solid')
   const [consistencyPercent, setConsistencyPercent] = useState(initial?.consistencyPercent ?? 50)
+  const [calories, setCalories] = useState(initial?.calories != null ? String(initial.calories) : '')
   const [notes, setNotes] = useState(initial?.notes ?? '')
   const [beforePhoto, setBeforePhoto] = useState<File | 'keep' | 'remove'>('keep')
   const [afterPhoto, setAfterPhoto] = useState<File | 'keep' | 'remove'>('keep')
@@ -40,6 +43,10 @@ export function MealForm({
     () => mealDurationMinutes({ time, endTime }),
     [time, endTime],
   )
+  const parsedCaloriesPreview = calories.trim() === '' ? null : Number(calories)
+  const thisCalories = parsedCaloriesPreview != null && Number.isFinite(parsedCaloriesPreview) ? parsedCaloriesPreview : 0
+  const alreadyCalories = totalCalories(logged.filter((item) => item.id !== initial?.id && item.date === date))
+  const calorieTotal = alreadyCalories + thisCalories
 
   return (
     <form
@@ -48,6 +55,7 @@ export function MealForm({
         event.preventDefault()
         if (!foods.trim() || saving) return
         const parsedQuantity = quantity.trim() === '' ? null : Number(quantity)
+        const parsedCalories = calories.trim() === '' ? null : Number(calories)
         const id = initial?.id ?? crypto.randomUUID()
         setSaving(true)
         try {
@@ -78,6 +86,7 @@ export function MealForm({
             quantityUnit,
             consistency,
             consistencyPercent: consistency === 'semi-solid' ? consistencyPercent : null,
+            calories: parsedCalories != null && Number.isFinite(parsedCalories) ? parsedCalories : null,
             notes: notes.trim(),
             hasBeforePhoto,
             hasAfterPhoto,
@@ -208,6 +217,25 @@ export function MealForm({
           />
         </div>
       </div>
+
+      <label className="field">
+        <span>Calories (optional)</span>
+        <input
+          type="number"
+          min="0"
+          step="1"
+          inputMode="decimal"
+          value={calories}
+          onChange={(e) => setCalories(e.target.value)}
+          placeholder="e.g. 180"
+        />
+      </label>
+      {(alreadyCalories > 0 || thisCalories > 0) && (
+        <div className="calorie-total">
+          <span>Total calorie consumption</span>
+          <strong>{formatCalories(calorieTotal)}</strong>
+        </div>
+      )}
 
       <label className="field">
         <span>Notes (optional)</span>
