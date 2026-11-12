@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Meal {
+  id                 String    @id
+  date               String
+  time               String
+  endTime            String    @default("") @map("end_time")
+  type               String
+  foods              String
+  quantity           Float?
+  quantityUnit       String    @map("quantity_unit")
+  consistency        String
+  consistencyPercent Int?      @map("consistency_percent")
+  notes              String    @default("")
+  hasBeforePhoto     Boolean   @default(false) @map("has_before_photo")
+  hasAfterPhoto      Boolean   @default(false) @map("has_after_photo")
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@index([date, time], map: "meals_date_idx")
+  @@map("meals")
+}
+
+model Poop {
+  id        String   @id
+  date      String
+  time      String
+  bristol   Int      @db.SmallInt
+  color     String
+  amount    String
+  straining Boolean  @default(false)
+  pain      Boolean  @default(false)
+  mucus     Boolean  @default(false)
+  notes     String   @default("")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@index([date, time], map: "poops_date_idx")
+  @@map("poops")
+}
+
+model Mood {
+  id        String   @id
+  date      String
+  time      String
+  mood      String
+  notes     String   @default("")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@index([date, time], map: "moods_date_idx")
+  @@map("moods")
+}
+
+model DayNote {
+  date      String   @id
+  note      String
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@map("day_notes")
+}
+
+/// Photos are stored without a meal foreign key so a before/after image can be
+/// uploaded with a new meal id before the meal row itself exists.
+model MealPhoto {
+  mealId String @map("meal_id")
+  slot   String
+  mime   String
+  bytes  Bytes
+
+  @@id([mealId, slot])
+  @@map("meal_photos")
+}

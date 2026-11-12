@@ -1,0 +1,37 @@
+{
+  "name": "ashrit-journal",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "vite",
+    "dev:api": "tsx server/index.ts",
+    "build": "prisma generate && tsc -b && vite build",
+    "postinstall": "prisma generate",
+    "start": "tsx server/index.ts",
+    "prisma:generate": "prisma generate",
+    "lint": "oxlint",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.16",
+    "@prisma/client": "^7.10.1",
+    "express": "^5.3.0",
+    "pglite-prisma-adapter": "^0.7.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "oxlint": "^1.90.0",
+    "prisma": "^7.10.1",
+    "tsx": "^4.23.15",
+    "typescript": "~7.0.2",
+    "vite": "^8.3.6"
+  }
+}
