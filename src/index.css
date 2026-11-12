@@ -1029,22 +1029,35 @@ input[type='range'] {
   margin-bottom: 18px;
 }
 
-.history-day h4 {
-  margin: 0 0 8px;
-  font-family: Fraunces, Georgia, serif;
+.history-day-head {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
-.history-date {
-  border: 0;
-  background: transparent;
-  font: inherit;
-  padding: 0;
-  color: var(--sage);
+.history-day-head h2 {
+  margin: 0;
+  font-family: Fraunces, Georgia, serif;
+  font-size: 1.2rem;
+  line-height: 1.25;
+}
+
+.history-day-head p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.history-note {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  background: var(--cream);
+  border-radius: 14px;
+  padding: 12px 14px;
 }
 
 .toolbar {

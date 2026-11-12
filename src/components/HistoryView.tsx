@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { bristolMeta, mealLabel, moodMeta, stoolColorMeta } from '../constants'
 import {
   formatLongDate,
@@ -23,7 +23,7 @@ import {
 import { parseImportedJournal } from '../storage'
 import type { JournalData, MealEntry, MoodEntry, PoopEntry, WaterEntry } from '../types'
 import { formatTotalMl, formatWater, totalWaterMl } from '../water'
-import { Chevron } from './Icons'
+import { Chevron, MoodFace, StoolArt, WaterDrop } from './Icons'
 import { MealPhotoStrip } from './MealPhotos'
 
 type Filter = 'all' | 'meals' | 'poops' | 'moods' | 'water'
@@ -173,21 +173,48 @@ export function HistoryView({
       </section>
 
       <section className="history-day">
-        <h4>
-          <button className="history-date" onClick={() => onOpenDate(selected)}>
-            {formatLongDate(selected)}
-          </button>
-          <button className="today-chip" onClick={() => onOpenDate(selected)}>
+        <div className="history-day-head">
+          <div>
+            <h2>{formatLongDate(selected)}</h2>
+            <p>{empty ? 'Nothing logged on this day' : 'What was logged this day'}</p>
+          </div>
+          <button className="add-btn" onClick={() => onOpenDate(selected)}>
             Modify
           </button>
-        </h4>
+        </div>
         {empty ? (
-          <div className="empty">Nothing logged on this day.</div>
+          <div className="empty">Tap a date with a dot, or modify this day to add entries.</div>
         ) : (
           <DayEntries meals={meals} poops={poops} moods={moods} waters={waters} note={note} />
         )}
       </section>
     </>
+  )
+}
+
+function byTime<T extends { time: string }>(items: T[]) {
+  return [...items].sort((a, b) => a.time.localeCompare(b.time))
+}
+
+function DaySection({
+  title,
+  hint,
+  children,
+}: {
+  title: string
+  hint?: string
+  children: ReactNode
+}) {
+  return (
+    <section className="section">
+      <div className="section-head">
+        <div>
+          <h3>{title}</h3>
+          {hint && <p>{hint}</p>}
+        </div>
+      </div>
+      {children}
+    </section>
   )
 }
 
@@ -204,87 +231,136 @@ function DayEntries({
   waters: WaterEntry[]
   note?: string
 }) {
+  const mealList = byTime(meals)
+  const waterList = byTime(waters)
+  const poopList = byTime(poops)
+  const moodList = byTime(moods)
+  const caloriesLogged = hasCalories(mealList)
+
   return (
-    <div className="entry-list">
-      {meals.sort((a, b) => a.time.localeCompare(b.time)).map((entry) => {
-        const duration = mealDurationMinutes(entry)
-        const bits = [
-          entry.quantity != null ? formatQuantity(entry.quantity, entry.quantityUnit) : '',
-          formatConsistency(entry.consistency, entry.consistencyPercent),
-          entry.calories != null ? formatCalories(entry.calories) : '',
-          duration != null ? formatDuration(duration) : '',
-          entry.notes,
-        ].filter(Boolean)
-        return (
-          <div className="entry meal-card" key={entry.id}>
-            <div className="entry-body">
-              <span className="badge">{mealLabel(entry.type)}</span>
-              <span>
-                <div className="title">{entry.foods}</div>
-                {bits.length > 0 && <div className="detail">{bits.join(' · ')}</div>}
-              </span>
-              <span className="meta">
-                {formatTime(entry.time)}
-                {entry.endTime ? ` – ${formatTime(entry.endTime)}` : ''}
-              </span>
-            </div>
-            <MealPhotoStrip
-              mealId={entry.id}
-              before={entry.hasBeforePhoto}
-              after={entry.hasAfterPhoto}
-            />
+    <>
+      {mealList.length > 0 && (
+        <DaySection
+          title="Meals & snacks"
+          hint={caloriesLogged ? `${formatCalories(totalCalories(mealList))} this day` : `${mealList.length} logged`}
+        >
+          <div className="entry-list">
+            {mealList.map((entry) => {
+              const duration = mealDurationMinutes(entry)
+              const bits = [
+                entry.quantity != null ? formatQuantity(entry.quantity, entry.quantityUnit) : '',
+                formatConsistency(entry.consistency, entry.consistencyPercent),
+                entry.calories != null ? formatCalories(entry.calories) : '',
+                duration != null ? formatDuration(duration) : '',
+                entry.notes,
+              ].filter(Boolean)
+              return (
+                <div className="entry meal-card" key={entry.id}>
+                  <div className="entry-body">
+                    <span className="badge">{mealLabel(entry.type)}</span>
+                    <span>
+                      <div className="title">{entry.foods}</div>
+                      {bits.length > 0 && <div className="detail">{bits.join(' · ')}</div>}
+                    </span>
+                    <span className="meta">
+                      {formatTime(entry.time)}
+                      {entry.endTime ? ` – ${formatTime(entry.endTime)}` : ''}
+                    </span>
+                  </div>
+                  <MealPhotoStrip
+                    mealId={entry.id}
+                    before={entry.hasBeforePhoto}
+                    after={entry.hasAfterPhoto}
+                  />
+                </div>
+              )
+            })}
           </div>
-        )
-      })}
-      {hasCalories(meals) && (
-        <div className="calorie-total">
-          <span>Total calorie consumption</span>
-          <strong>{formatCalories(totalCalories(meals))}</strong>
-        </div>
+          {caloriesLogged && (
+            <div className="calorie-total">
+              <span>Total calorie consumption</span>
+              <strong>{formatCalories(totalCalories(mealList))}</strong>
+            </div>
+          )}
+        </DaySection>
       )}
-      {poops.sort((a, b) => a.time.localeCompare(b.time)).map((entry) => (
-        <div className="entry" key={entry.id}>
-          <span className="badge">Poop {entry.bristol}</span>
-          <span>
-            <div className="title">{bristolMeta(entry.bristol).title}</div>
-            <div className="detail">{stoolColorMeta(entry.color).label} · {entry.amount}</div>
-          </span>
-          <span className="meta">{formatTime(entry.time)}</span>
-        </div>
-      ))}
-      {moods.sort((a, b) => a.time.localeCompare(b.time)).map((entry) => (
-        <div className="entry" key={entry.id}>
-          <span className="badge">Mood</span>
-          <span>
-            <div className="title">{moodMeta(entry.mood).label}</div>
-            {entry.notes && <div className="detail">{entry.notes}</div>}
-          </span>
-          <span className="meta">{formatTime(entry.time)}</span>
-        </div>
-      ))}
-      {waters.sort((a, b) => a.time.localeCompare(b.time)).map((entry) => (
-        <div className="entry" key={entry.id}>
-          <span className="badge">Water</span>
-          <span>
-            <div className="title">{formatWater(entry.amount, entry.unit)}</div>
-            {entry.notes && <div className="detail">{entry.notes}</div>}
-          </span>
-          <span className="meta">{formatTime(entry.time)}</span>
-        </div>
-      ))}
-      {waters.length > 0 && (
-        <div className="water-total">
-          <span>Total water consumption</span>
-          <strong>{formatTotalMl(totalWaterMl(waters))}</strong>
-        </div>
+
+      {waterList.length > 0 && (
+        <DaySection title="Water" hint={`${formatTotalMl(totalWaterMl(waterList))} this day`}>
+          <div className="entry-list">
+            {waterList.map((entry) => (
+              <div className="entry" key={entry.id}>
+                <WaterDrop />
+                <span>
+                  <div className="title">{formatWater(entry.amount, entry.unit)}</div>
+                  {entry.notes && <div className="detail">{entry.notes}</div>}
+                </span>
+                <span className="meta">{formatTime(entry.time)}</span>
+              </div>
+            ))}
+          </div>
+          <div className="water-total">
+            <span>Total water consumption</span>
+            <strong>{formatTotalMl(totalWaterMl(waterList))}</strong>
+          </div>
+        </DaySection>
       )}
+
+      {poopList.length > 0 && (
+        <DaySection title="Poop log" hint={`${poopList.length} logged`}>
+          <div className="entry-list">
+            {poopList.map((entry) => {
+              const meta = bristolMeta(entry.bristol)
+              const color = stoolColorMeta(entry.color)
+              return (
+                <div className="entry" key={entry.id}>
+                  <StoolArt type={entry.bristol} />
+                  <span>
+                    <div className="title">
+                      Type {entry.bristol} · {meta.title}
+                    </div>
+                    <div className="detail">
+                      {color.label} · {entry.amount}
+                      {entry.notes ? ` · ${entry.notes}` : ''}
+                    </div>
+                    {(entry.straining || entry.pain || entry.mucus) && (
+                      <div className="flags">
+                        {entry.straining && <span className="flag">Straining</span>}
+                        {entry.pain && <span className="flag">Pain</span>}
+                        {entry.mucus && <span className="flag">Mucus</span>}
+                      </div>
+                    )}
+                  </span>
+                  <span className="meta">{formatTime(entry.time)}</span>
+                </div>
+              )
+            })}
+          </div>
+        </DaySection>
+      )}
+
+      {moodList.length > 0 && (
+        <DaySection title="Mood" hint={`${moodList.length} logged`}>
+          <div className="entry-list">
+            {moodList.map((entry) => (
+              <div className="entry" key={entry.id}>
+                <MoodFace mood={entry.mood} />
+                <span>
+                  <div className="title">{moodMeta(entry.mood).label}</div>
+                  {entry.notes && <div className="detail">{entry.notes}</div>}
+                </span>
+                <span className="meta">{formatTime(entry.time)}</span>
+              </div>
+            ))}
+          </div>
+        </DaySection>
+      )}
+
       {note?.trim() && (
-        <div className="entry">
-          <span className="badge">Note</span>
-          <span><div className="detail">{note}</div></span>
-          <span />
-        </div>
+        <DaySection title="Day note">
+          <p className="history-note">{note}</p>
+        </DaySection>
       )}
-    </div>
+    </>
   )
 }
