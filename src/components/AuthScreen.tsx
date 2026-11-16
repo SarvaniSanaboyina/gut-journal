@@ -1,28 +1,33 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import type { useAuth } from '../auth'
-import { journalTitle } from '../constants'
+import { BIRTH_DATE_MIN, journalTitle } from '../constants'
+import { todayISO } from '../dates'
 
 type Auth = ReturnType<typeof useAuth>
 
 export function AuthScreen({ auth }: { auth: Auth }) {
   const setup = auth.status === 'needs-setup'
-  const [name, setName] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirm, setConfirm] = useState('')
+  const [name, setName] = useState(auth.accountName ?? '')
+  const [birthDate, setBirthDate] = useState('')
   const title = journalTitle(setup ? name : auth.accountName)
+  const latestBirthDate = todayISO()
 
   useEffect(() => {
     document.title = title
   }, [title])
 
+  useEffect(() => {
+    if (auth.accountName && !name) setName(auth.accountName)
+  }, [auth.accountName, name])
+
   function onSubmit(event: FormEvent) {
     event.preventDefault()
     if (auth.busy) return
     if (setup) {
-      void auth.setup(name, password, confirm)
+      void auth.setup(name, birthDate)
       return
     }
-    void auth.login(password)
+    void auth.login(birthDate)
   }
 
   return (
@@ -34,17 +39,17 @@ export function AuthScreen({ auth }: { auth: Auth }) {
           </div>
           <div>
             <h1>{title}</h1>
-            <p>Family password lock</p>
+            <p>Family lock</p>
           </div>
         </div>
       </header>
 
       <form className="auth-card" onSubmit={onSubmit}>
-        <h2>{setup ? 'Set a password' : 'Sign in'}</h2>
+        <h2>{setup ? 'Set a date of birth' : 'Sign in'}</h2>
         <p>
           {setup
-            ? 'Pick a password so only your family can open this journal. It stays on this computer.'
-            : 'Enter the family password to open the journal.'}
+            ? "We'll use the child's date of birth to open this journal. It stays on this computer."
+            : "Enter the child's date of birth to open the journal."}
         </p>
 
         {setup && (
@@ -63,38 +68,24 @@ export function AuthScreen({ auth }: { auth: Auth }) {
         )}
 
         <label className="field">
-          <span>Password</span>
+          <span>Date of birth</span>
           <input
-            type="password"
-            name="password"
-            autoComplete={setup ? 'new-password' : 'current-password'}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            minLength={6}
+            type="date"
+            name="birthDate"
+            autoComplete="bday"
+            min={BIRTH_DATE_MIN}
+            max={latestBirthDate}
+            value={birthDate}
+            onChange={(event) => setBirthDate(event.target.value)}
             required
           />
         </label>
-
-        {setup && (
-          <label className="field">
-            <span>Confirm password</span>
-            <input
-              type="password"
-              name="confirm"
-              autoComplete="new-password"
-              value={confirm}
-              onChange={(event) => setConfirm(event.target.value)}
-              minLength={6}
-              required
-            />
-          </label>
-        )}
 
         {auth.error && <p className="alert">{auth.error}</p>}
 
         <div className="actions">
           <button className="primary" type="submit" disabled={auth.busy}>
-            {auth.busy ? 'Please wait…' : setup ? 'Save password' : 'Open journal'}
+            {auth.busy ? 'Please wait…' : setup ? 'Save date of birth' : 'Open journal'}
           </button>
         </div>
       </form>

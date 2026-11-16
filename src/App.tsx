@@ -7,7 +7,7 @@ import { Chevron } from './components/Icons'
 import { MealForm } from './components/MealForm'
 import { Modal } from './components/Modal'
 import { MoodForm } from './components/MoodForm'
-import { PasswordForm } from './components/PasswordForm'
+import { BirthDateForm } from './components/BirthDateForm'
 import { PoopForm } from './components/PoopForm'
 import { TodayView } from './components/TodayView'
 import { WaterForm } from './components/WaterForm'
@@ -51,7 +51,7 @@ export default function App() {
             </div>
             <div>
               <h1>{heading}</h1>
-              <p>Family password lock</p>
+              <p>Family lock</p>
             </div>
           </div>
         </header>
@@ -85,7 +85,7 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
   const [date, setDate] = useState(todayISO)
   const [view, setView] = useState<View>('today')
   const [editor, setEditor] = useState<Editor | null>(null)
-  const [passwordOpen, setPasswordOpen] = useState(false)
+  const [birthDateOpen, setBirthDateOpen] = useState(false)
 
   const title = useMemo(() => {
     if (isToday(date)) return 'Today'
@@ -104,7 +104,7 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
           </div>
         </div>
         <AccountMenu
-          onChangePassword={() => setPasswordOpen(true)}
+          onChangeBirthDate={() => setBirthDateOpen(true)}
           onSignOut={() => void onSignOut()}
         />
       </header>
@@ -202,7 +202,7 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
         />
       )}
 
-      <nav className="tabs" hidden={Boolean(editor) || passwordOpen || journal.status !== 'ready'}>
+      <nav className="tabs" hidden={Boolean(editor) || birthDateOpen || journal.status !== 'ready'}>
         <button className={view === 'today' ? 'active' : ''} onClick={() => setView('today')}>
           Today
         </button>
@@ -304,11 +304,11 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
         </Modal>
       )}
 
-      {passwordOpen && (
-        <Modal title="Change password" onClose={() => setPasswordOpen(false)}>
-          <PasswordForm
-            onCancel={() => setPasswordOpen(false)}
-            onSaved={() => setPasswordOpen(false)}
+      {birthDateOpen && (
+        <Modal title="Change date of birth" onClose={() => setBirthDateOpen(false)}>
+          <BirthDateForm
+            onCancel={() => setBirthDateOpen(false)}
+            onSaved={() => setBirthDateOpen(false)}
           />
         </Modal>
       )}

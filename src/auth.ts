@@ -76,24 +76,24 @@ export function useAuth() {
     return () => window.removeEventListener('journal:unauthorized', onUnauthorized)
   }, [])
 
-  const setup = useCallback(async (name: string, password: string, confirm: string) => {
+  const setup = useCallback(async (name: string, birthDate: string) => {
     setBusy(true)
     setError(null)
     try {
-      const next = await setupAccount({ name, password, confirm })
+      const next = await setupAccount({ name, birthDate })
       remember(next.user)
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Could not save the password')
+      setError(saveError instanceof Error ? saveError.message : 'Could not save the date of birth')
     } finally {
       setBusy(false)
     }
   }, [remember])
 
-  const login = useCallback(async (password: string) => {
+  const login = useCallback(async (birthDate: string) => {
     setBusy(true)
     setError(null)
     try {
-      const next = await requestLogin(password)
+      const next = await requestLogin(birthDate)
       remember(next.user)
     } catch (saveError) {
       setError(saveError instanceof AuthError || saveError instanceof Error

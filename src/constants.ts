@@ -9,6 +9,7 @@ import type {
 } from './types'
 
 export const APP_NAME = 'Journal'
+export const BIRTH_DATE_MIN = '1990-01-01'
 
 export function journalTitle(name?: string | null) {
   const trimmed = name?.trim()

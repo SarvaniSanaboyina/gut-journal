@@ -1,7 +1,9 @@
 import { type FormEvent, useState } from 'react'
 import { changePassword } from '../api'
+import { BIRTH_DATE_MIN } from '../constants'
+import { todayISO } from '../dates'
 
-export function PasswordForm({
+export function BirthDateForm({
   onCancel,
   onSaved,
 }: {
@@ -9,10 +11,10 @@ export function PasswordForm({
   onSaved: () => void
 }) {
   const [current, setCurrent] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirm, setConfirm] = useState('')
+  const [birthDate, setBirthDate] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const latestBirthDate = todayISO()
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
@@ -20,10 +22,10 @@ export function PasswordForm({
     setBusy(true)
     setError(null)
     try {
-      await changePassword({ current, password, confirm })
+      await changePassword({ current, birthDate })
       onSaved()
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Could not change the password')
+      setError(saveError instanceof Error ? saveError.message : 'Could not change the date of birth')
     } finally {
       setBusy(false)
     }
@@ -32,37 +34,28 @@ export function PasswordForm({
   return (
     <form className="form-grid" onSubmit={onSubmit}>
       <label className="field">
-        <span>Current password</span>
+        <span>Current date of birth</span>
         <input
-          type="password"
-          name="current-password"
-          autoComplete="current-password"
+          type="date"
+          name="current-birth-date"
+          autoComplete="bday"
+          min={BIRTH_DATE_MIN}
+          max={latestBirthDate}
           value={current}
           onChange={(event) => setCurrent(event.target.value)}
           required
         />
       </label>
       <label className="field">
-        <span>New password</span>
+        <span>New date of birth</span>
         <input
-          type="password"
-          name="new-password"
-          autoComplete="new-password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          minLength={6}
-          required
-        />
-      </label>
-      <label className="field">
-        <span>Confirm new password</span>
-        <input
-          type="password"
-          name="confirm-password"
-          autoComplete="new-password"
-          value={confirm}
-          onChange={(event) => setConfirm(event.target.value)}
-          minLength={6}
+          type="date"
+          name="new-birth-date"
+          autoComplete="bday"
+          min={BIRTH_DATE_MIN}
+          max={latestBirthDate}
+          value={birthDate}
+          onChange={(event) => setBirthDate(event.target.value)}
           required
         />
       </label>
@@ -72,7 +65,7 @@ export function PasswordForm({
           Cancel
         </button>
         <button className="primary" type="submit" disabled={busy}>
-          {busy ? 'Saving…' : 'Save password'}
+          {busy ? 'Saving…' : 'Save date of birth'}
         </button>
       </div>
     </form>

@@ -6,9 +6,8 @@ import { HttpError } from './journal.ts'
 const COOKIE = 'journal_session'
 const SESSION_MS = 1000 * 60 * 60 * 24 * 30
 const SCRYPT_KEYLEN = 32
-const MIN_PASSWORD = 6
-const MAX_PASSWORD = 200
 const MAX_NAME = 80
+const MIN_BIRTH_YEAR = 1990
 
 export type AuthUser = { id: string; name: string }
 
@@ -57,10 +56,29 @@ function parseName(value: unknown): string {
   return name
 }
 
-function parsePassword(value: unknown): string {
-  if (typeof value !== 'string') return bad(400, 'Enter a password')
-  if (value.length < MIN_PASSWORD) return bad(400, `Use at least ${MIN_PASSWORD} characters`)
-  if (value.length > MAX_PASSWORD) return bad(400, 'That password is too long')
+function todayLocalISO() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function parseBirthDate(value: unknown): string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return bad(400, 'Enter a date of birth')
+  }
+  const [year, month, day] = value.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day))
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return bad(400, 'Enter a real date')
+  }
+  if (year < MIN_BIRTH_YEAR) return bad(400, 'Enter a date of birth')
+  if (value > todayLocalISO()) return bad(400, 'Date of birth cannot be in the future')
   return value
 }
 
@@ -147,13 +165,11 @@ export async function authStatus(prisma: PrismaClient, req: Request) {
 }
 
 export async function setupAccount(prisma: PrismaClient, req: Request, res: Response) {
-  if (await prisma.account.count()) return bad(409, 'The journal already has a password')
+  if (await prisma.account.count()) return bad(409, 'The journal already has a date of birth')
   if (!isRecord(req.body)) return bad(400, 'Invalid request')
   const name = parseName(req.body.name)
-  const password = parsePassword(req.body.password)
-  const confirm = typeof req.body.confirm === 'string' ? req.body.confirm : ''
-  if (confirm !== password) return bad(400, 'Passwords do not match')
-  const { salt, hash } = hashPassword(password)
+  const birthDate = parseBirthDate(req.body.birthDate)
+  const { salt, hash } = hashPassword(birthDate)
   const account = await prisma.account.create({
     data: {
       id: crypto.randomUUID(),
@@ -169,12 +185,12 @@ export async function setupAccount(prisma: PrismaClient, req: Request, res: Resp
 export async function login(prisma: PrismaClient, req: Request, res: Response) {
   throttleLogin(req)
   if (!isRecord(req.body)) return bad(400, 'Invalid request')
-  const password = typeof req.body.password === 'string' ? req.body.password : ''
+  const birthDate = typeof req.body.birthDate === 'string' ? req.body.birthDate : ''
   const account = await prisma.account.findFirst()
-  if (!account) return bad(400, 'Set up a password first')
-  if (!verifyPassword(password, account.passwordSalt, account.passwordHash)) {
+  if (!account) return bad(400, 'Set up a date of birth first')
+  if (!verifyPassword(birthDate, account.passwordSalt, account.passwordHash)) {
     recordLoginFailure(req)
-    return bad(401, 'Wrong password')
+    return bad(401, 'Wrong date of birth')
   }
   clearLoginFailures(req)
   await prisma.session.deleteMany({ where: { expiresAt: { lte: new Date() } } })
@@ -194,18 +210,16 @@ export async function changePassword(prisma: PrismaClient, req: Request) {
   if (!session) return bad(401, 'Please sign in')
   if (!isRecord(req.body)) return bad(400, 'Invalid request')
   const current = typeof req.body.current === 'string' ? req.body.current : ''
-  const password = parsePassword(req.body.password)
-  const confirm = typeof req.body.confirm === 'string' ? req.body.confirm : ''
-  if (confirm !== password) return bad(400, 'Passwords do not match')
+  const birthDate = parseBirthDate(req.body.birthDate)
   if (!verifyPassword(current, session.account.passwordSalt, session.account.passwordHash)) {
     recordLoginFailure(req)
-    return bad(400, 'Wrong current password')
+    return bad(400, 'Wrong current date of birth')
   }
-  if (verifyPassword(password, session.account.passwordSalt, session.account.passwordHash)) {
-    return bad(400, 'Pick a different password')
+  if (verifyPassword(birthDate, session.account.passwordSalt, session.account.passwordHash)) {
+    return bad(400, 'Pick a different date of birth')
   }
   clearLoginFailures(req)
-  const { salt, hash } = hashPassword(password)
+  const { salt, hash } = hashPassword(birthDate)
   await prisma.account.update({
     where: { id: session.account.id },
     data: { passwordHash: hash, passwordSalt: salt },

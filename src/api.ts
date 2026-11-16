@@ -70,19 +70,19 @@ export function getAuthStatus() {
   return sendJson<AuthStatus>('/api/auth/status')
 }
 
-export function setupAccount(body: { name: string; password: string; confirm: string }) {
+export function setupAccount(body: { name: string; birthDate: string }) {
   return sendJson<{ user: AuthUser }>('/api/auth/setup', jsonBody('POST', body))
 }
 
-export function login(password: string) {
-  return sendJson<{ user: AuthUser }>('/api/auth/login', jsonBody('POST', { password }))
+export function login(birthDate: string) {
+  return sendJson<{ user: AuthUser }>('/api/auth/login', jsonBody('POST', { birthDate }))
 }
 
 export async function logout() {
   await send('/api/auth/logout', { method: 'POST' })
 }
 
-export async function changePassword(body: { current: string; password: string; confirm: string }) {
+export async function changePassword(body: { current: string; birthDate: string }) {
   await send('/api/password', jsonBody('POST', body))
 }
 

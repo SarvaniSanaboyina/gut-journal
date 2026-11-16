@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { MenuIcon } from './Icons'
 
 export function AccountMenu({
-  onChangePassword,
+  onChangeBirthDate,
   onSignOut,
 }: {
-  onChangePassword: () => void
+  onChangeBirthDate: () => void
   onSignOut: () => void
 }) {
   const [open, setOpen] = useState(false)
@@ -46,10 +46,10 @@ export function AccountMenu({
             role="menuitem"
             onClick={() => {
               setOpen(false)
-              onChangePassword()
+              onChangeBirthDate()
             }}
           >
-            Change password
+            Change date of birth
           </button>
           <button
             type="button"
