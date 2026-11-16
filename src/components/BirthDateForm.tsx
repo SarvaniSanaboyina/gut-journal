@@ -1,7 +1,7 @@
 import { type FormEvent, useState } from 'react'
 import { changePassword } from '../api'
-import { BIRTH_DATE_MIN } from '../constants'
-import { todayISO } from '../dates'
+import { emptyBirthDateParts, joinBirthDate } from '../dates'
+import { BirthDateFields } from './BirthDateFields'
 
 export function BirthDateForm({
   onCancel,
@@ -10,19 +10,24 @@ export function BirthDateForm({
   onCancel: () => void
   onSaved: () => void
 }) {
-  const [current, setCurrent] = useState('')
-  const [birthDate, setBirthDate] = useState('')
+  const [current, setCurrent] = useState(emptyBirthDateParts)
+  const [birthDate, setBirthDate] = useState(emptyBirthDateParts)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const latestBirthDate = todayISO()
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
     if (busy) return
+    const currentIso = joinBirthDate(current)
+    const nextIso = joinBirthDate(birthDate)
+    if (!currentIso || !nextIso) {
+      setError('Enter a real date of birth')
+      return
+    }
     setBusy(true)
     setError(null)
     try {
-      await changePassword({ current, birthDate })
+      await changePassword({ current: currentIso, birthDate: nextIso })
       onSaved()
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Could not edit the date of birth')
@@ -33,32 +38,24 @@ export function BirthDateForm({
 
   return (
     <form className="form-grid" onSubmit={onSubmit}>
-      <label className="field">
-        <span>Current date of birth</span>
-        <input
-          type="date"
-          name="current-birth-date"
-          autoComplete="bday"
-          min={BIRTH_DATE_MIN}
-          max={latestBirthDate}
-          value={current}
-          onChange={(event) => setCurrent(event.target.value)}
-          required
-        />
-      </label>
-      <label className="field">
-        <span>New date of birth</span>
-        <input
-          type="date"
-          name="new-birth-date"
-          autoComplete="bday"
-          min={BIRTH_DATE_MIN}
-          max={latestBirthDate}
-          value={birthDate}
-          onChange={(event) => setBirthDate(event.target.value)}
-          required
-        />
-      </label>
+      <BirthDateFields
+        id="current-birth-date"
+        label="Current date of birth"
+        value={current}
+        onChange={(next) => {
+          setError(null)
+          setCurrent(next)
+        }}
+      />
+      <BirthDateFields
+        id="new-birth-date"
+        label="New date of birth"
+        value={birthDate}
+        onChange={(next) => {
+          setError(null)
+          setBirthDate(next)
+        }}
+      />
       {error && <p className="alert">{error}</p>}
       <div className="actions">
         <button className="ghost" type="button" onClick={onCancel} disabled={busy}>

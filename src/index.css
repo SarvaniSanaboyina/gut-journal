@@ -101,6 +101,7 @@ select {
 
 .app.locked {
   padding-bottom: max(28px, env(safe-area-inset-bottom, 0px));
+  padding-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right));
 }
 
 .auth-card {
@@ -111,10 +112,63 @@ select {
   box-shadow: var(--shadow);
 }
 
+.kid-auth {
+  position: relative;
+  overflow: hidden;
+  border: 3px solid #d7c2f3;
+  border-radius: 28px;
+  background:
+    radial-gradient(120px 80px at 12% 0%, rgba(142, 200, 240, 0.28), transparent 70%),
+    radial-gradient(140px 90px at 100% 8%, rgba(243, 194, 208, 0.35), transparent 70%),
+    linear-gradient(#fffdf9, #f7f0ff);
+  padding: 28px clamp(14px, 3.6vw, 20px) 22px;
+}
+
+.auth-stickers {
+  position: absolute;
+  inset: 10px 12px auto;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.auth-stickers i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  transform: rotate(20deg);
+  background: #f4d36a;
+}
+
+.auth-stickers i:nth-child(2) {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  transform: none;
+  background: #8ec8f0;
+}
+
+.auth-stickers i:nth-child(3) {
+  width: 0;
+  height: 0;
+  border-radius: 0;
+  background: transparent;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 12px solid #e08aaa;
+  transform: rotate(18deg);
+}
+
 .auth-card h2 {
   font-family: var(--font-display);
   font-weight: 600;
   margin: 0 0 8px;
+}
+
+.kid-auth h2 {
+  text-align: center;
+  font-size: 1.85rem;
+  margin-top: 8px;
 }
 
 .auth-card > p {
@@ -123,15 +177,158 @@ select {
   line-height: 1.45;
 }
 
+.kid-auth > p {
+  text-align: center;
+  font-size: 1.02rem;
+}
+
 .auth-card .field {
   display: block;
   margin-bottom: 14px;
+}
+
+.kid-auth .field input {
+  min-height: 48px;
+  border-radius: 16px;
+  background: #fff8ee;
+  border: 2px solid #ead7a8;
+  font-family: var(--font-display);
+  font-weight: 600;
 }
 
 .auth-card .actions {
   position: static;
   box-shadow: none;
   padding: 6px 0 0;
+}
+
+.dob-otp {
+  container-type: inline-size;
+  width: 100%;
+  margin: 0 0 16px;
+}
+
+.dob-legend {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--sage);
+  text-align: center;
+}
+
+.dob-otp-track {
+  position: relative;
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 0.18rem;
+  width: 100%;
+  max-width: min(100%, 22.5rem);
+  margin-inline: auto;
+  padding-top: 1.55em;
+  cursor: text;
+}
+
+.dob-group {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.dob-group-day,
+.dob-group-month {
+  flex: 2 1 0;
+}
+
+.dob-group-year {
+  flex: 4 1 0;
+}
+
+.dob-group-label {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22em;
+  margin-bottom: 6px;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.dob-group-label svg {
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+}
+
+.dob-cells {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.dob-cell {
+  box-sizing: border-box;
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+  max-width: 2.4rem;
+  aspect-ratio: 6 / 7;
+  height: auto;
+  border: 2px solid var(--line);
+  background: var(--card);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: clamp(1.12rem, 5.8cqi, 1.35rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  padding: 0;
+  overflow: visible;
+}
+
+.dob-cell.is-active {
+  border-color: var(--sage);
+  box-shadow: 0 0 0 3px rgba(123, 92, 176, 0.16);
+}
+
+.dob-sep {
+  flex: 0 0 auto;
+  font-family: var(--font-display);
+  font-size: clamp(1.05rem, 5cqi, 1.35rem);
+  font-weight: 650;
+  color: var(--sage-mid);
+  padding-bottom: 0.35em;
+}
+
+input.dob-otp-input[type='text'] {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  max-width: 1px;
+  height: 1px;
+  opacity: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  pointer-events: none;
+  font-size: 16px;
 }
 
 .account-menu {

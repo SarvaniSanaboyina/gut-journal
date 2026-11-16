@@ -1,16 +1,18 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import type { useAuth } from '../auth'
-import { BIRTH_DATE_MIN, journalTitle } from '../constants'
-import { todayISO } from '../dates'
+import { journalTitle } from '../constants'
+import { emptyBirthDateParts, joinBirthDate } from '../dates'
+import { BirthDateFields } from './BirthDateFields'
 
 type Auth = ReturnType<typeof useAuth>
 
 export function AuthScreen({ auth }: { auth: Auth }) {
   const setup = auth.status === 'needs-setup'
   const [name, setName] = useState(auth.accountName ?? '')
-  const [birthDate, setBirthDate] = useState('')
-  const title = journalTitle(setup ? name : auth.accountName)
-  const latestBirthDate = todayISO()
+  const [birthDate, setBirthDate] = useState(emptyBirthDateParts)
+  const [localError, setLocalError] = useState<string | null>(null)
+  const childName = auth.accountName?.trim()
+  const title = journalTitle(setup ? name : childName)
 
   useEffect(() => {
     document.title = title
@@ -23,11 +25,17 @@ export function AuthScreen({ auth }: { auth: Auth }) {
   function onSubmit(event: FormEvent) {
     event.preventDefault()
     if (auth.busy) return
-    if (setup) {
-      void auth.setup(name, birthDate)
+    const iso = joinBirthDate(birthDate)
+    if (!iso) {
+      setLocalError('Enter a real date of birth')
       return
     }
-    void auth.login(birthDate)
+    setLocalError(null)
+    if (setup) {
+      void auth.setup(name, iso)
+      return
+    }
+    void auth.login(iso)
   }
 
   return (
@@ -44,12 +52,17 @@ export function AuthScreen({ auth }: { auth: Auth }) {
         </div>
       </header>
 
-      <form className="auth-card" onSubmit={onSubmit}>
-        <h2>{setup ? 'Set a date of birth' : 'Sign in'}</h2>
+      <form className="auth-card kid-auth" onSubmit={onSubmit}>
+        <div className="auth-stickers" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+        </div>
+        <h2>{setup ? "Let's start!" : 'Hey!'}</h2>
         <p>
           {setup
-            ? "We'll use the child's date of birth to open this journal. It stays on this computer."
-            : "Enter the child's date of birth to open the journal."}
+            ? 'Write the name and birthday to make this journal.'
+            : `Type ${childName}'s date of birth to open the journal.`}
         </p>
 
         {setup && (
@@ -67,25 +80,20 @@ export function AuthScreen({ auth }: { auth: Auth }) {
           </label>
         )}
 
-        <label className="field">
-          <span>Date of birth</span>
-          <input
-            type="date"
-            name="birthDate"
-            autoComplete="bday"
-            min={BIRTH_DATE_MIN}
-            max={latestBirthDate}
-            value={birthDate}
-            onChange={(event) => setBirthDate(event.target.value)}
-            required
-          />
-        </label>
+        <BirthDateFields
+          id="birthDate"
+          value={birthDate}
+          onChange={(next) => {
+            setLocalError(null)
+            setBirthDate(next)
+          }}
+        />
 
-        {auth.error && <p className="alert">{auth.error}</p>}
+        {(localError || auth.error) && <p className="alert">{localError || auth.error}</p>}
 
         <div className="actions">
           <button className="primary" type="submit" disabled={auth.busy}>
-            {auth.busy ? 'Please wait…' : setup ? 'Save date of birth' : 'Open journal'}
+            {auth.busy ? 'Please wait…' : setup ? 'Save and open' : "Let's go!"}
           </button>
         </div>
       </form>

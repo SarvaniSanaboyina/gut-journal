@@ -1,5 +1,35 @@
+import { BIRTH_DATE_MIN } from './constants'
+
 export function todayISO(): string {
   return toISODate(new Date())
+}
+
+export type BirthDateParts = {
+  day: string
+  month: string
+  year: string
+}
+
+export const emptyBirthDateParts: BirthDateParts = { day: '', month: '', year: '' }
+
+export function joinBirthDate(parts: BirthDateParts): string | null {
+  const day = Number(parts.day.trim())
+  const month = Number(parts.month.trim())
+  const yearText = parts.year.trim()
+  const year = Number(yearText)
+  if (!Number.isInteger(day) || !Number.isInteger(month) || !Number.isInteger(year)) return null
+  if (yearText.length !== 4) return null
+  const iso = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  const date = new Date(Date.UTC(year, month - 1, day))
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null
+  }
+  if (iso < BIRTH_DATE_MIN || iso > todayISO()) return null
+  return iso
 }
 
 export function toISODate(date: Date): string {
