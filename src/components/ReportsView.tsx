@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { bristolMeta, moodMeta } from '../constants'
+import { moodMeta, poopConsistency, POOP_CONSISTENCIES } from '../constants'
 import {
   calendarWeek,
   formatLongDate,
@@ -65,11 +65,12 @@ export function ReportsView({
   const periodPoops = data.poops.filter((item) => days.includes(item.date))
   const periodMoods = data.moods.filter((item) => days.includes(item.date))
   const water = weekWater(data, days)
-  const bristolCounts = periodPoops.reduce<Record<number, number>>((acc, item) => {
-    acc[item.bristol] = (acc[item.bristol] ?? 0) + 1
+  const consistencyCounts = periodPoops.reduce<Record<string, number>>((acc, item) => {
+    const id = poopConsistency(item.bristol)
+    acc[id] = (acc[id] ?? 0) + 1
     return acc
   }, {})
-  const commonBristol = Object.entries(bristolCounts).sort((a, b) => b[1] - a[1])[0]
+  const commonConsistency = Object.entries(consistencyCounts).sort((a, b) => b[1] - a[1])[0]
   const moodCounts = periodMoods.reduce<Record<string, number>>((acc, item) => {
     acc[item.mood] = (acc[item.mood] ?? 0) + 1
     return acc
@@ -274,8 +275,8 @@ export function ReportsView({
           <div className="row">
             <span>Most common stool</span>
             <strong>
-              {commonBristol
-                ? `Type ${commonBristol[0]} · ${bristolMeta(Number(commonBristol[0]) as 1 | 2 | 3 | 4 | 5 | 6 | 7).title}`
+              {commonConsistency
+                ? POOP_CONSISTENCIES.find((item) => item.id === commonConsistency[0])?.label ?? '—'
                 : '—'}
             </strong>
           </div>

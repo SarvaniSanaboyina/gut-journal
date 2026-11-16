@@ -1,4 +1,4 @@
-import { bristolMeta, moodMeta, stoolColorMeta } from '../constants'
+import { moodMeta, poopConsistencyMeta, stoolColorMeta } from '../constants'
 import { formatTime } from '../dates'
 import { formatCalories, hasCalories, totalCalories } from '../meals'
 import type { JournalData, MealEntry, MoodEntry, PoopEntry, WaterEntry } from '../types'
@@ -48,7 +48,7 @@ export function TodayView({
   const calorieTotal = totalCalories(meals)
   const caloriesLogged = hasCalories(meals)
   const poopSummary = poops.length === 1
-    ? `Type ${poops[0].bristol}`
+    ? poopConsistencyMeta(poops[0].bristol).label
     : poops.length > 1
       ? `${poops.length}`
       : '—'
@@ -141,7 +141,7 @@ export function TodayView({
         <div className="section-head">
           <div>
             <h3>Poop log</h3>
-            <p>Time, Bristol type, color, and how it felt</p>
+            <p>Time, consistency, color, and how it felt</p>
           </div>
           <button className="add-btn" onClick={onAddPoop}>+ Add</button>
         </div>
@@ -150,14 +150,14 @@ export function TodayView({
         ) : (
           <div className="entry-list">
             {poops.map((entry) => {
-              const meta = bristolMeta(entry.bristol)
+              const meta = poopConsistencyMeta(entry.bristol)
               const color = stoolColorMeta(entry.color)
               return (
                 <button key={entry.id} className="entry" onClick={() => onEditPoop(entry)}>
-                  <StoolArt type={entry.bristol} />
+                  <StoolArt type={meta.bristol} />
                   <span>
                     <div className="title">
-                      Type {entry.bristol} · {meta.title}
+                      {meta.label}
                     </div>
                     <div className="detail">
                       {color.label} · {entry.amount}

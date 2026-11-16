@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BRISTOL, STOOL_AMOUNTS, STOOL_COLORS, stoolColorMeta } from '../constants'
+import { POOP_CONSISTENCIES, poopConsistency, STOOL_AMOUNTS, STOOL_COLORS, stoolColorMeta } from '../constants'
 import { nowTime } from '../dates'
 import type { BristolType, PoopEntry, StoolAmount, StoolColor } from '../types'
 import { StoolArt } from './Icons'
@@ -36,7 +36,10 @@ export function PoopForm({
           id: initial?.id ?? crypto.randomUUID(),
           date,
           time,
-          bristol,
+          bristol:
+            initial && poopConsistency(bristol) === poopConsistency(initial.bristol)
+              ? initial.bristol
+              : bristol,
           color,
           amount,
           straining,
@@ -52,22 +55,21 @@ export function PoopForm({
       </label>
 
       <div>
-        <span className="field-label">How did it look? (Bristol scale)</span>
+        <span className="field-label">Consistency</span>
         <div className="choice-grid bristol" style={{ marginTop: 8 }}>
-          {BRISTOL.map((item) => (
+          {POOP_CONSISTENCIES.map((item) => (
             <button
-              key={item.type}
+              key={item.id}
               type="button"
-              className={`choice ${bristol === item.type ? 'selected' : ''}`}
-              onClick={() => setBristol(item.type)}
+              className={`choice ${poopConsistency(bristol) === item.id ? 'selected' : ''}`}
+              onClick={() => setBristol(item.bristol)}
             >
               <span className="bristol-choice">
-                <span className="bristol-num">{item.type}</span>
+                <StoolArt type={item.bristol} />
                 <span>
-                  {item.title}
+                  {item.label}
                   <small>{item.hint}</small>
                 </span>
-                <StoolArt type={item.type} />
               </span>
             </button>
           ))}

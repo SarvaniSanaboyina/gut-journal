@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { bristolMeta, moodMeta, stoolColorMeta } from '../constants'
+import { moodMeta, poopConsistencyMeta, stoolColorMeta } from '../constants'
 import {
   formatLongDate,
   formatMonthYear,
@@ -275,14 +275,14 @@ function DayEntries({
         <DaySection title="Poop log" hint={`${poopList.length} logged`}>
           <div className="entry-list">
             {poopList.map((entry) => {
-              const meta = bristolMeta(entry.bristol)
+              const meta = poopConsistencyMeta(entry.bristol)
               const color = stoolColorMeta(entry.color)
               return (
                 <div className="entry" key={entry.id}>
-                  <StoolArt type={entry.bristol} />
+                  <StoolArt type={meta.bristol} />
                   <span>
                     <div className="title">
-                      Type {entry.bristol} · {meta.title}
+                      {meta.label}
                     </div>
                     <div className="detail">
                       {color.label} · {entry.amount}

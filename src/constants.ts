@@ -3,6 +3,7 @@ import type {
   MealConsistency,
   MealType,
   MoodKind,
+  PoopConsistency,
   QuantityUnit,
   StoolAmount,
   StoolColor,
@@ -49,19 +50,15 @@ export const QUANTITY_UNITS: { id: QuantityUnit; label: string }[] = [
   { id: 'ml', label: 'ml' },
 ]
 
-export const BRISTOL: {
-  type: BristolType
-  title: string
+export const POOP_CONSISTENCIES: {
+  id: PoopConsistency
+  label: string
   hint: string
-  tone: 'constipated' | 'ideal' | 'loose'
+  bristol: BristolType
 }[] = [
-  { type: 1, title: 'Hard pellets', hint: 'Separate lumps, like nuts', tone: 'constipated' },
-  { type: 2, title: 'Lumpy sausage', hint: 'Sausage-shaped, lumpy', tone: 'constipated' },
-  { type: 3, title: 'Cracked sausage', hint: 'Sausage with cracks on the surface', tone: 'ideal' },
-  { type: 4, title: 'Smooth sausage', hint: 'Soft, smooth, and easy to pass', tone: 'ideal' },
-  { type: 5, title: 'Soft blobs', hint: 'Soft pieces with clear edges', tone: 'loose' },
-  { type: 6, title: 'Mushy', hint: 'Fluffy, mushy pieces', tone: 'loose' },
-  { type: 7, title: 'Watery', hint: 'Entirely liquid, no pieces', tone: 'loose' },
+  { id: 'hard', label: 'Hard', hint: 'Pellets or lumpy', bristol: 2 },
+  { id: 'soft', label: 'Soft', hint: 'Smooth and formed', bristol: 4 },
+  { id: 'watery', label: 'Watery', hint: 'Loose or liquid', bristol: 7 },
 ]
 
 export const STOOL_COLORS: { id: StoolColor; label: string; swatch: string; alert?: boolean }[] = [
@@ -98,8 +95,15 @@ export function mealLabel(type: MealType): string {
   return MEAL_TYPES.find((item) => item.id === type)?.label ?? type
 }
 
-export function bristolMeta(type: BristolType) {
-  return BRISTOL.find((item) => item.type === type)!
+export function poopConsistency(type: BristolType): PoopConsistency {
+  if (type <= 2) return 'hard'
+  if (type >= 6) return 'watery'
+  return 'soft'
+}
+
+export function poopConsistencyMeta(type: BristolType) {
+  const id = poopConsistency(type)
+  return POOP_CONSISTENCIES.find((item) => item.id === id)!
 }
 
 export function moodMeta(mood: MoodKind) {
