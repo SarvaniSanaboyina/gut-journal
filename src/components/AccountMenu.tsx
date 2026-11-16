@@ -49,7 +49,7 @@ export function AccountMenu({
               onChangeBirthDate()
             }}
           >
-            Change date of birth
+            Edit date of birth
           </button>
           <button
             type="button"

@@ -305,7 +305,7 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
       )}
 
       {birthDateOpen && (
-        <Modal title="Change date of birth" onClose={() => setBirthDateOpen(false)}>
+        <Modal title="Edit date of birth" onClose={() => setBirthDateOpen(false)}>
           <BirthDateForm
             onCancel={() => setBirthDateOpen(false)}
             onSaved={() => setBirthDateOpen(false)}

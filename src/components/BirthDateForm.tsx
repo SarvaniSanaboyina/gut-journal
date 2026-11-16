@@ -25,7 +25,7 @@ export function BirthDateForm({
       await changePassword({ current, birthDate })
       onSaved()
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Could not change the date of birth')
+      setError(saveError instanceof Error ? saveError.message : 'Could not edit the date of birth')
     } finally {
       setBusy(false)
     }
