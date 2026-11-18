@@ -238,6 +238,10 @@ export function DoctorReport({ data, childName, onClose }: { data: JournalData; 
             </>
           )}
           <p className="report-small">
+            Daily nutrition assessment (only days with all five meals recorded): {summary.nutritionDays.within} within, {summary.nutritionDays.below} below and {summary.nutritionDays.above} above the reference range
+            {summary.nutritionDays.overUpperLimit ? `, upper limit exceeded on ${summary.nutritionDays.overUpperLimit}` : ''}; {summary.nutritionDays.insufficient + summary.nutritionDays.notAssessed} not assessed.
+          </p>
+          <p className="report-small">
             Meal schedule (3 meals + 2 snacks): all five recorded on {summary.schedule.completeDays} days, partly on {summary.schedule.incompleteDays}, not recorded on {summary.schedule.noLogDays}.
             {summary.schedule.avgEaten != null && ` On recorded days, ${summary.schedule.avgEaten.toFixed(1)} meals eaten and ${summary.schedule.avgSkipped!.toFixed(1)} skipped on average.`}
             {SLOTS.some((slot) => summary.schedule.skippedBySlot[slot.id] > 0) &&

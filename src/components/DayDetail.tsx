@@ -2,12 +2,14 @@ import { useMemo } from 'react'
 import { formatLongDate, formatTime } from '../dates'
 import { foodMap } from '../foods'
 import { BRISTOL_TYPES } from '../gut'
-import { buildDayIndex, COMPLETION_LABEL, CONSUMPTION_META, DEFAULT_THRESHOLDS, summariseDay } from '../mealSlots'
+import { buildDayIndex, COMPLETION_LABEL, summariseDay } from '../mealSlots'
+import { assessDay, CALENDAR_META, calendarState } from '../nutritionAssessment'
 import type { JournalData, MealEntry, PoopEntry, SlotType, SymptomEntry, WaterEntry } from '../types'
 import { formatTotalMl, formatWater } from '../water'
 import { PoopRow, SymptomRow } from './GutEntries'
 import { WaterDrop } from './Icons'
 import { MealSchedule } from './MealSchedule'
+import { NutritionPanel } from './NutritionPanel'
 
 function byTime<T extends { time: string }>(items: T[]) {
   return [...items].sort((a, b) => a.time.localeCompare(b.time))
@@ -41,16 +43,22 @@ export function DayDetail({
   onEditSymptom: (entry: SymptomEntry) => void
   onOpenDiary: () => void
 }) {
-  const summary = useMemo(
-    () => summariseDay(buildDayIndex(data), date, foodMap(data.foods), data.settings.calendarThresholds ?? DEFAULT_THRESHOLDS),
-    [data, date],
+  const summary = useMemo(() => summariseDay(buildDayIndex(data), date, foodMap(data.foods)), [data, date])
+  const { completion, records } = summary
+  const calendar = useMemo(
+    () => calendarState(completion.status === 'complete', completion.skipped === 5, records.meals, data.foods, data.settings, date),
+    [completion, records.meals, data.foods, data.settings, date],
   )
-  const { completion, consumption, records } = summary
+  // Show what is known so far even on an incomplete day; the colour stays "not logged".
+  const nutrition = useMemo(
+    () => calendar.nutrition ?? (records.meals.length ? assessDay(records.meals, data.foods, data.settings, date) : null),
+    [calendar.nutrition, records.meals, data.foods, data.settings, date],
+  )
   const waters = byTime(records.waters)
   const poops = byTime(records.poops)
   const symptoms = byTime(records.symptoms)
   const others = records.meals.filter((meal) => meal.type === 'mini-snack')
-  const meta = CONSUMPTION_META[consumption.state]
+  const meta = CALENDAR_META[calendar.state]
 
   return (
     <div className="day-detail">
@@ -59,10 +67,7 @@ export function DayDetail({
       <section className="day-summary" aria-label="Daily summary">
         <div className="day-summary-row">
           <span className={`completion-badge ${completion.status}`}>{COMPLETION_LABEL[completion.status]}</span>
-          <span className="consumption-chip" style={{ background: meta.color }}>
-            {meta.label}
-            {consumption.percent != null && consumption.state !== 'all-skipped' ? ` · ${Math.round(consumption.percent)}%` : ''}
-          </span>
+          <span className="consumption-chip" style={{ background: meta.color }}>Nutrition: {meta.label.toLowerCase()}</span>
         </div>
         <dl className="day-summary-grid">
           <div><dt>Meals eaten</dt><dd>{completion.eaten}/5</dd></div>
@@ -72,11 +77,18 @@ export function DayDetail({
           <div><dt>Bowel movements</dt><dd>{summary.bowelMovements}</dd></div>
           <div><dt>Symptoms</dt><dd>{symptoms.length ? symptoms.length : '—'}</dd></div>
         </dl>
-        {consumption.state === 'not-logged' && completion.status !== 'not-logged' && (
-          <p className="muted-note">The amount eaten is worked out once all five meals are recorded as eaten or not eaten.</p>
-        )}
-        {consumption.state === 'unknown' && <p className="muted-note">Some eaten meals have no amounts recorded, so the day’s consumption can’t be estimated.</p>}
+        <p className="muted-note">Meal tracking (complete or not) is separate from nutrition: a complete day is not necessarily a balanced one.</p>
       </section>
+
+      <NutritionPanel
+        state={calendar.state}
+        nutrition={nutrition}
+        completeNote={
+          completion.status === 'not-logged'
+            ? 'No meals recorded for this day.'
+            : 'Not all five meals are recorded yet, so the day is not assessed (missing meals are not counted as zero). Estimates so far are shown below.'
+        }
+      />
 
       <MealSchedule summary={summary} title="Meals" showSummary={false} onLog={onLogSlot} onEditMeal={onEditMeal} onSkip={onSkipSlot} onClearSkip={onClearSlot} />
 

@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS food_items (
 );
 
 CREATE INDEX IF NOT EXISTS food_items_custom_idx ON food_items (is_custom);
+ALTER TABLE food_items ADD COLUMN IF NOT EXISTS source_note text NOT NULL DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS meal_items (
   id text PRIMARY KEY,

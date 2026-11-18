@@ -19,7 +19,7 @@ const DATE = '2026-11-18'
 function food(id: string, unitGrams: FoodEntry['unitGrams'] = {}): FoodEntry {
   return {
     id, name: id, aliases: [], category: 'cereals', groups: ['carbohydrate'], defaultUnit: 'pieces', defaultQty: 1,
-    unitGrams, nutrients: {} as FoodEntry['nutrients'], nutrientSource: 'none', ingredients: [], isCustom: false,
+    unitGrams, nutrients: {} as FoodEntry['nutrients'], nutrientSource: 'none', sourceNote: '', ingredients: [], isCustom: false,
   }
 }
 
@@ -50,7 +50,7 @@ function water(amount: number, unit: WaterEntry['unit'] = 'ml', date = DATE): Wa
 }
 
 function summary(data: JournalData, date = DATE) {
-  return summariseDay(buildDayIndex(data), date, foodMap(data.foods), data.settings.calendarThresholds)
+  return summariseDay(buildDayIndex(data), date, foodMap(data.foods))
 }
 
 const allFive = (items: () => MealItem[]) =>
@@ -134,8 +134,8 @@ describe('consumption calculation', () => {
   it('uses configurable thresholds', () => {
     const data = journal({ meals: allFive(() => [item('idli', 4, 3)]) })
     assert.equal(summary(data).consumption.state, 'enough')
-    data.settings = { ...data.settings, calendarThresholds: { lessBelow: 80, moreAbove: 120 } }
-    assert.equal(summary(data).consumption.state, 'less')
+    const day = summariseDay(buildDayIndex(data), DATE, foodMap(data.foods), { lessBelow: 80, moreAbove: 120 })
+    assert.equal(day.consumption.state, 'less')
   })
 
   it('does not classify a complete day with unrecorded amounts', () => {

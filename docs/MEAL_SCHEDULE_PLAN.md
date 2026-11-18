@@ -1,5 +1,7 @@
 # Daily meal schedule & calendar history — design
 
+> **Update:** calendar colours are now based on nutrient intake, not on the share of served food eaten. See `NUTRITION_ASSESSMENT.md`. The consumption share described below is still used as an eating-habit metric in reports.
+
 ## What exists today
 
 - **Journal and child:** one journal per child, so there is no `childId` column anywhere. Each database belongs to one child.

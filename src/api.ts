@@ -159,7 +159,7 @@ export function putMealSlot(date: string, mealType: SlotType, change: SlotChange
   )
 }
 
-export function putSetting<T>(key: 'child-profile' | 'nutrient-references' | 'calendar-thresholds', value: T) {
+export function putSetting<T>(key: 'child-profile' | 'nutrient-references' | 'nutrition-assessment', value: T) {
   return sendJson<T>(`/api/settings/${key}`, putJson(value))
 }
 

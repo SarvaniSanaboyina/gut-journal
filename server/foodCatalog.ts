@@ -1,3 +1,4 @@
+import { IFCT } from './ifctData.ts'
 /**
  * Built-in food catalogue. It is upserted into `food_items` on every boot, so editing
  * this file updates the catalogue; parents' custom foods live in the same table with
@@ -60,6 +61,9 @@ export type CatalogFood = {
   unitGrams: UnitGrams
   nutrients: Nutrients
   ingredients?: string[]
+  /** Set from COMPOSITION below. */
+  source?: CompositionSource
+  compositionNote?: string
 }
 
 /** kcal, protein g, carbs g, fat g, fibre g, iron mg, calcium mg, vitamin D µg, zinc mg, vitamin C mg, omega-3 g */
@@ -202,5 +206,123 @@ export const FOOD_CATALOG: CatalogFood[] = [
   { id: 'fresh-juice', name: 'Fresh fruit juice', aliases: ['orange juice', 'juice'], category: 'beverages', groups: [], defaultUnit: 'ml', defaultQty: 100, unitGrams: LIQUID, nutrients: n(45, 0.7, 10.4, 0.2, 0.2, 0.2, 11, 0, 0.05, 50, null) },
   { id: 'packaged-juice', name: 'Packaged juice', aliases: ['fruit drink', 'tetra pack'], category: 'beverages', groups: [], defaultUnit: 'ml', defaultQty: 100, unitGrams: LIQUID, nutrients: n(45, 0.2, 11, 0.1, 0.2, null, null, null, null, null, null) },
 ]
+
+/**
+ * Where each food's nutrient values come from.
+ *
+ * - `ifct`: one IFCT 2017 food, per 100 g edible portion (raw composition; cooking losses of
+ *   heat-sensitive vitamins are not modelled).
+ * - `recipe`: a standard home recipe calculated from IFCT 2017 ingredients. `parts` are raw
+ *   ingredient grams and `cooked` is the weight of the finished dish they make (water absorbed or
+ *   added), so values are per 100 g of the dish as eaten.
+ * - Foods not listed (packaged and processed foods, and a few not in IFCT 2017) keep the
+ *   approximate values above and are shown as estimates.
+ */
+type Composition = { ifct: string } | { parts: [string, number][]; cooked: number }
+
+const COMPOSITION: Record<string, Composition> = {
+  // Cereals — cooked weights are typical home yields
+  rice: { parts: [['A015', 100]], cooked: 300 },
+  idli: { parts: [['A015', 67], ['B003', 33]], cooked: 210 },
+  dosa: { parts: [['A015', 67], ['B003', 33], ['T005', 8]], cooked: 190 },
+  uttapam: { parts: [['A015', 67], ['B003', 33], ['T005', 8], ['G017', 15], ['D075', 15]], cooked: 220 },
+  chapati: { parts: [['A019', 100], ['T013', 3]], cooked: 150 },
+  paratha: { parts: [['A019', 100], ['T013', 15]], cooked: 165 },
+  'ragi-flour': { ifct: 'A010' },
+  'ragi-porridge': { parts: [['A010', 15], ['L002', 100]], cooked: 175 },
+  pongal: { parts: [['A015', 60], ['B010', 30], ['T013', 8]], cooked: 300 },
+  khichdi: { parts: [['A015', 60], ['B010', 40], ['T013', 5]], cooked: 350 },
+  'curd-rice': { parts: [['A015', 30], ['L002', 60]], cooked: 150 },
+  upma: { parts: [['A022', 50], ['T005', 5], ['G017', 10]], cooked: 180 },
+  poha: { parts: [['A011', 50], ['T005', 5], ['G017', 10], ['H012', 5]], cooked: 130 },
+  dalia: { parts: [['A021', 30]], cooked: 150 },
+  // Legumes
+  dal: { parts: [['B021', 30], ['T013', 2]], cooked: 150 },
+  'moong-dal': { parts: [['B010', 30], ['T013', 2]], cooked: 150 },
+  'urad-dal': { parts: [['B003', 30]], cooked: 120 },
+  sambar: { parts: [['B021', 15], ['D046', 10], ['D075', 10], ['G017', 10], ['T005', 3]], cooked: 180 },
+  rasam: { parts: [['B021', 5], ['D075', 30]], cooked: 150 },
+  chana: { parts: [['B002', 40]], cooked: 100 },
+  rajma: { parts: [['B020', 40]], cooked: 100 },
+  // Dairy and protein foods (curd taken as whole cow milk; IFCT 2017 has no curd entry)
+  milk: { ifct: 'L002' },
+  curd: { parts: [['L002', 100]], cooked: 100 },
+  paneer: { ifct: 'L003' },
+  egg: { ifct: 'M004' },
+  omelette: { parts: [['M007', 100]], cooked: 100 },
+  chicken: { parts: [['N001', 100]], cooked: 75 },
+  fish: { parts: [['S006', 100]], cooked: 80 },
+  // Fruits
+  banana: { ifct: 'E012' },
+  papaya: { ifct: 'E049' },
+  apple: { ifct: 'E001' },
+  mango: { ifct: 'E036' },
+  orange: { ifct: 'E047' },
+  guava: { ifct: 'E028' },
+  grapes: { ifct: 'E026' },
+  pomegranate: { ifct: 'E055' },
+  watermelon: { ifct: 'E065' },
+  chikoo: { ifct: 'E060' },
+  pear: { ifct: 'E051' },
+  dates: { ifct: 'E017' },
+  raisins: { ifct: 'E057' },
+  avocado: { ifct: 'E007' },
+  // Vegetables
+  carrot: { ifct: 'F002' },
+  spinach: { ifct: 'C033' },
+  beans: { ifct: 'D050' },
+  'sweet-potato': { ifct: 'F014' },
+  potato: { ifct: 'F006' },
+  tomato: { ifct: 'D075' },
+  cucumber: { ifct: 'D043' },
+  peas: { ifct: 'D061' },
+  pumpkin: { ifct: 'D066' },
+  'bottle-gourd': { ifct: 'D007' },
+  beetroot: { ifct: 'F001' },
+  cauliflower: { ifct: 'D036' },
+  drumstick: { ifct: 'D046' },
+  onion: { ifct: 'G017' },
+  'mixed-veg': { parts: [['F002', 30], ['D050', 30], ['D061', 20], ['F006', 20], ['T005', 4]], cooked: 104 },
+  'veg-soup': { parts: [['D075', 40], ['F002', 20], ['G017', 10]], cooked: 150 },
+  // Fats, nuts and seeds
+  ghee: { ifct: 'T013' },
+  almonds: { ifct: 'H001' },
+  walnuts: { ifct: 'H021' },
+  flaxseed: { ifct: 'H014' },
+  coconut: { ifct: 'H007' },
+  'coconut-chutney': { parts: [['H007', 40], ['B001', 10], ['T005', 2]], cooked: 100 },
+  'coconut-water': { ifct: 'K002' },
+}
+
+function compose(composition: Composition): Nutrients {
+  if ('ifct' in composition) return { ...IFCT[composition.ifct].nutrients }
+  const result = {} as Nutrients
+  for (const key of NUTRIENT_KEYS) {
+    let total: number | null = 0
+    for (const [code, grams] of composition.parts) {
+      const value = IFCT[code].nutrients[key]
+      total = value == null || total == null ? null : total + (value * grams) / 100
+    }
+    result[key] = total == null ? null : Math.round((total / composition.cooked) * 100 * 1000) / 1000
+  }
+  return result
+}
+
+export type CompositionSource = 'ifct' | 'recipe' | 'estimate'
+
+/** Apply IFCT-derived values; returns the catalogue with each food's composition source. */
+for (const food of FOOD_CATALOG) {
+  const composition = COMPOSITION[food.id]
+  if (!composition) {
+    food.source = 'estimate'
+    continue
+  }
+  food.nutrients = compose(composition)
+  food.source = 'ifct' in composition ? 'ifct' : 'recipe'
+  food.compositionNote =
+    'ifct' in composition
+      ? `IFCT 2017 ${composition.ifct}: ${IFCT[composition.ifct].name}`
+      : `Recipe from IFCT 2017: ${composition.parts.map(([code, grams]) => `${grams} g ${IFCT[code].name.toLowerCase()}`).join(', ')} → ${composition.cooked} g cooked`
+}
 
 export const CATALOG_IDS = new Set(FOOD_CATALOG.map((food) => food.id))

@@ -140,7 +140,10 @@ function estimateIngredient(item: MealIngredient, food: FoodEntry | undefined, s
   return {
     name: item.name,
     status: food.nutrientSource === 'label' ? 'label' : 'estimated',
-    reason: food.nutrientSource === 'label' ? 'From pack label' : converted.generic ? 'Estimate (standard household measure)' : 'Estimate',
+    reason:
+      food.nutrientSource === 'label'
+        ? 'From pack label'
+        : `${food.nutrientSource === 'ifct' ? 'IFCT 2017' : food.nutrientSource === 'recipe' ? 'IFCT 2017 recipe' : 'Approximate value'}${converted.generic ? ', standard household measure' : ''}`,
     grams: converted.grams,
     genericMeasure: converted.generic,
     values,

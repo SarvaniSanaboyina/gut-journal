@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import {
   formatMonthRange,
   formatLongDate,
@@ -22,10 +22,12 @@ import { comparisonSections, previousRange, reportHighlights, summarisePeriod, t
 import { DISCLAIMER } from '../safety'
 import type { ChildProfile, GrowthEntry, JournalData, MealEntry, PoopEntry, SymptomEntry } from '../types'
 import { BarList, ColumnChart } from './Charts'
-import { DoctorReport } from './DoctorReport'
-import { GrowthView } from './GrowthView'
 import { Chevron } from './Icons'
 import { TimelineView } from './TimelineView'
+
+// Growth (WHO tables) and the printable report load on demand to keep the main bundle small.
+const GrowthView = lazy(() => import('./GrowthView').then((module) => ({ default: module.GrowthView })))
+const DoctorReport = lazy(() => import('./DoctorReport').then((module) => ({ default: module.DoctorReport })))
 
 type Tab = 'summary' | 'timeline' | 'growth'
 
@@ -339,10 +341,18 @@ export function ReportsView({
 
       {tab === 'summary' && <Summary data={data} date={date} onChangeDate={onChangeDate} />}
       {tab === 'timeline' && <TimelineView data={data} onEditMeal={onEditMeal} onEditPoop={onEditPoop} onEditSymptom={onEditSymptom} />}
-      {tab === 'growth' && <GrowthView data={data} onSave={onSaveGrowth} onDelete={onDeleteGrowth} onSaveProfile={onSaveProfile} />}
+      {tab === 'growth' && (
+        <Suspense fallback={<div className="empty">Loading growth charts…</div>}>
+          <GrowthView data={data} onSave={onSaveGrowth} onDelete={onDeleteGrowth} onSaveProfile={onSaveProfile} />
+        </Suspense>
+      )}
       <p className="disclaimer">{DISCLAIMER}</p>
 
-      {doctorOpen && <DoctorReport data={data} childName={childName} onClose={() => setDoctorOpen(false)} />}
+      {doctorOpen && (
+        <Suspense fallback={null}>
+          <DoctorReport data={data} childName={childName} onClose={() => setDoctorOpen(false)} />
+        </Suspense>
+      )}
     </>
   )
 }

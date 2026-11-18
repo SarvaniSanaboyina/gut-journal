@@ -6,6 +6,8 @@ import { CustomFoodForm } from './CustomFoodForm'
 
 function SourceTag({ food }: { food: FoodEntry }) {
   if (food.nutrientSource === 'label') return <span className="tag label">From label</span>
+  if (food.nutrientSource === 'ifct') return <span className="tag label">IFCT 2017</span>
+  if (food.nutrientSource === 'recipe') return <span className="tag label">IFCT recipe</span>
   if (food.nutrientSource === 'catalogue') return <span className="tag estimate">Estimate</span>
   return <span className="tag missing">No nutrient data</span>
 }
@@ -30,8 +32,12 @@ function FoodDetails({ food }: { food: FoodEntry }) {
         ))}
       </div>
       <p className="muted-note" style={{ margin: 0 }}>
-        Per 100 g. {food.nutrientSource === 'catalogue'
-          ? 'Approximate values from Indian (IFCT 2017) and USDA food composition tables — home recipes vary.'
+        Per 100 g. {food.nutrientSource === 'ifct'
+          ? `${food.sourceNote}. Indian Food Composition Tables 2017 (NIN-ICMR), raw composition.`
+          : food.nutrientSource === 'recipe'
+            ? `${food.sourceNote}. Calculated from IFCT 2017 ingredients; home recipes vary.`
+            : food.nutrientSource === 'catalogue'
+          ? 'Approximate value — this food is not in IFCT 2017, so treat it as a rough estimate.'
           : food.nutrientSource === 'label'
             ? 'Copied from the pack label.'
             : 'No reliable values, so this food is left out of nutrient estimates.'}

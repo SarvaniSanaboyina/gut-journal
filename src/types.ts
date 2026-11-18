@@ -63,7 +63,7 @@ export type NutrientKey =
 export type Nutrients = Record<NutrientKey, number | null>
 
 /** `catalogue` = estimated from food composition tables, `label` = copied from a pack label by a parent. */
-export type NutrientSource = 'catalogue' | 'label' | 'none'
+export type NutrientSource = 'ifct' | 'recipe' | 'catalogue' | 'label' | 'none'
 
 export interface FoodEntry {
   id: string
@@ -76,6 +76,8 @@ export interface FoodEntry {
   unitGrams: Partial<Record<Exclude<FoodUnit, 'g'>, number>>
   nutrients: Nutrients
   nutrientSource: NutrientSource
+  /** Where the values come from (IFCT code, recipe, label). */
+  sourceNote: string
   ingredients: string[]
   isCustom: boolean
 }
@@ -227,12 +229,21 @@ export interface MealSlotEntry {
   note: string
 }
 
+/** Portion-share bands used by the "share of served food eaten" report metric (not the calendar). */
 export interface CalendarThresholds {
-  /** Day consumption below this percentage shows as "less". */
   lessBelow: number
-  /** Day consumption above this percentage shows as "more than usual". */
   moreAbove: number
 }
+
+/** Overrides for the daily nutrition assessment; missing fields use the defaults. */
+export type NutritionAssessmentSettings = Partial<{
+  lowPercent: number
+  energyHighPercent: number
+  aboveRecommendedPercent: number
+  minCoveragePercent: number
+  belowSharePercent: number
+  keyNutrients: NutrientKey[]
+}>
 
 export type MeasurePosition = '' | 'lying' | 'standing'
 
@@ -254,7 +265,7 @@ export interface ChildProfile {
 export interface Settings {
   childProfile: ChildProfile
   nutrientReferences: { custom: Partial<Record<NutrientKey, number>> }
-  calendarThresholds: CalendarThresholds
+  nutritionAssessment: NutritionAssessmentSettings
 }
 
 export const emptyJournal = (): JournalData => ({
@@ -268,5 +279,5 @@ export const emptyJournal = (): JournalData => ({
   dailyMetrics: [],
   growth: [],
   mealSlots: [],
-  settings: { childProfile: { sex: '', birthDate: '' }, nutrientReferences: { custom: {} }, calendarThresholds: { lessBelow: 50, moreAbove: 100 } },
+  settings: { childProfile: { sex: '', birthDate: '' }, nutrientReferences: { custom: {} }, nutritionAssessment: {} },
 })

@@ -132,6 +132,7 @@ model FoodItem {
   unitGrams      Json       @default("{}") @map("unit_grams")
   nutrients      Json       @default("{}")
   nutrientSource String     @default("none") @map("nutrient_source")
+  sourceNote     String     @default("") @map("source_note")
   ingredients    Json       @default("[]")
   isCustom       Boolean    @default(false) @map("is_custom")
   createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz()

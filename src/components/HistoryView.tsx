@@ -13,9 +13,11 @@ import {
 } from '../dates'
 import { foodMap } from '../foods'
 import { formatCalories, hasCalories, totalCalories } from '../meals'
-import { buildDayIndex, CONSUMPTION_META, DEFAULT_THRESHOLDS, summariseDay, type ConsumptionState } from '../mealSlots'
+import { buildDayIndex, summariseDay } from '../mealSlots'
+import { NUTRIENTS } from '../nutrition'
+import { assessmentConfig, CALENDAR_LEGEND_ORDER, CALENDAR_META, calendarState, type AssessmentConfig } from '../nutritionAssessment'
 import { parseImportedJournal } from '../storage'
-import type { CalendarThresholds, JournalData, MealEntry, MoodEntry, PoopEntry, WaterEntry } from '../types'
+import type { JournalData, NutrientKey, NutritionAssessmentSettings, MealEntry, MoodEntry, PoopEntry, WaterEntry } from '../types'
 import { formatTotalMl, formatWater, totalWaterMl } from '../water'
 import { Chevron, MoodFace, StoolArt, WaterDrop } from './Icons'
 import { MealCard } from './MealCard'
@@ -33,36 +35,51 @@ function datesWithEntries(data: JournalData) {
   return set
 }
 
-const LEGEND_ORDER: ConsumptionState[] = ['less', 'enough', 'more', 'not-logged', 'all-skipped', 'unknown']
+const KEY_CHOICES: NutrientKey[] = ['energyKcal', 'proteinG', 'carbsG', 'fatG', 'fibreG', 'ironMg', 'calciumMg', 'zincMg', 'vitaminCMg', 'vitaminDUg', 'omega3G']
 
-function ThresholdForm({ value, onSave, onClose }: { value: CalendarThresholds; onSave: (value: CalendarThresholds) => Promise<void>; onClose: () => void }) {
-  const [less, setLess] = useState(String(value.lessBelow))
-  const [more, setMore] = useState(String(value.moreAbove))
+function AssessmentForm({ value, onSave, onClose }: { value: AssessmentConfig; onSave: (value: NutritionAssessmentSettings) => Promise<void>; onClose: () => void }) {
+  const [low, setLow] = useState(String(value.lowPercent))
+  const [high, setHigh] = useState(String(value.energyHighPercent))
+  const [coverage, setCoverage] = useState(String(value.minCoveragePercent))
+  const [share, setShare] = useState(String(value.belowSharePercent))
+  const [keys, setKeys] = useState<NutrientKey[]>(value.keyNutrients)
   const [error, setError] = useState<string | null>(null)
   return (
     <form
       className="threshold-form"
       onSubmit={async (event) => {
         event.preventDefault()
-        const lessBelow = Number(less)
-        const moreAbove = Number(more)
-        if (!Number.isFinite(lessBelow) || !Number.isFinite(moreAbove) || lessBelow < 0 || moreAbove > 300 || lessBelow > moreAbove) {
-          setError('Use numbers from 0 to 300, with the first not above the second')
-          return
-        }
+        const numbers = [low, high, coverage, share].map(Number)
+        if (numbers.some((n) => !Number.isFinite(n))) return setError('Enter numbers in every box')
         try {
-          await onSave({ lessBelow, moreAbove })
+          await onSave({ lowPercent: numbers[0], energyHighPercent: numbers[1], minCoveragePercent: numbers[2], belowSharePercent: numbers[3], keyNutrients: keys })
           onClose()
         } catch (saveError) {
           setError(saveError instanceof Error ? saveError.message : 'Could not save')
         }
       }}
     >
-      <label className="field"><span>“Less” below (%)</span><input type="number" min="0" max="300" value={less} onChange={(event) => setLess(event.target.value)} /></label>
-      <label className="field"><span>“More” above (%)</span><input type="number" min="0" max="300" value={more} onChange={(event) => setMore(event.target.value)} /></label>
+      <label className="field"><span>“Below” under (% of reference)</span><input type="number" min="10" max="100" value={low} onChange={(event) => setLow(event.target.value)} /></label>
+      <label className="field"><span>Energy “above” over (%)</span><input type="number" min="100" max="300" value={high} onChange={(event) => setHigh(event.target.value)} /></label>
+      <label className="field"><span>Foods needing data (%)</span><input type="number" min="0" max="100" value={coverage} onChange={(event) => setCoverage(event.target.value)} /></label>
+      <label className="field"><span>Day “below” if this % of key nutrients are below</span><input type="number" min="1" max="100" value={share} onChange={(event) => setShare(event.target.value)} /></label>
+      <fieldset className="key-nutrients">
+        <legend>Key nutrients for the day’s colour (energy and protein always count)</legend>
+        {KEY_CHOICES.map((key) => (
+          <label key={key}>
+            <input
+              type="checkbox"
+              checked={keys.includes(key) || key === 'energyKcal' || key === 'proteinG'}
+              disabled={key === 'energyKcal' || key === 'proteinG'}
+              onChange={(event) => setKeys(event.target.checked ? [...keys, key] : keys.filter((item) => item !== key))}
+            />
+            {NUTRIENTS[key].label}
+          </label>
+        ))}
+      </fieldset>
       {error && <div className="alert" role="alert">{error}</div>}
       <div className="threshold-actions">
-        <button type="button" className="slot-btn" onClick={() => { setLess('50'); setMore('100') }}>Defaults</button>
+        <button type="button" className="slot-btn" onClick={async () => { await onSave({}); onClose() }}>Reset to defaults</button>
         <button type="button" className="slot-btn" onClick={onClose}>Cancel</button>
         <button type="submit" className="slot-btn primary-soft">Save</button>
       </div>
@@ -70,31 +87,26 @@ function ThresholdForm({ value, onSave, onClose }: { value: CalendarThresholds; 
   )
 }
 
-function CalendarLegend({ thresholds, onSaveThresholds }: { thresholds: CalendarThresholds; onSaveThresholds: (value: CalendarThresholds) => Promise<void> }) {
+function CalendarLegend({ config, onSaveAssessment }: { config: AssessmentConfig; onSaveAssessment: (value: NutritionAssessmentSettings) => Promise<void> }) {
   const [editing, setEditing] = useState(false)
-  const ranges: Partial<Record<ConsumptionState, string>> = {
-    less: `under ${thresholds.lessBelow}%`,
-    enough: `${thresholds.lessBelow}–${thresholds.moreAbove}%`,
-    more: `over ${thresholds.moreAbove}%`,
-  }
   return (
     <div className="cal-legend" aria-label="Calendar legend">
       <ul>
-        {LEGEND_ORDER.map((state) => (
+        {CALENDAR_LEGEND_ORDER.map((state) => (
           <li key={state}>
-            <i className={`cal-swatch ${state}`} style={{ background: CONSUMPTION_META[state].color }} aria-hidden="true" />
-            {CONSUMPTION_META[state].legend}
-            {ranges[state] && <small> ({ranges[state]})</small>}
+            <i className={`cal-swatch ${state}`} style={{ background: CALENDAR_META[state].color }} aria-hidden="true" />
+            {CALENDAR_META[state].legend}
           </li>
         ))}
         <li><span className="cal-legend-ml">450 ml</span> Water that day (— = none recorded)</li>
         <li><i className="cal-bm-dot" aria-hidden="true" /> Bowel movement recorded</li>
       </ul>
       <p>
-        Colour = share of served food eaten across the 5 scheduled meals (a skipped meal counts as 0%). Eating more is not automatically healthier.{' '}
-        <button type="button" className="link-btn" onClick={() => setEditing(!editing)}>{editing ? 'Close' : 'Adjust thresholds'}</button>
+        Colour = estimated nutrient intake vs age-specific references (ICMR-NIN 2020), judged nutrient by nutrient — energy,
+        protein, fibre, iron, calcium, zinc and vitamin C by default. Above the range or an upper limit is not “healthier”.{' '}
+        <button type="button" className="link-btn" onClick={() => setEditing(!editing)}>{editing ? 'Close' : 'Adjust assessment'}</button>
       </p>
-      {editing && <ThresholdForm value={thresholds} onSave={onSaveThresholds} onClose={() => setEditing(false)} />}
+      {editing && <AssessmentForm value={config} onSave={onSaveAssessment} onClose={() => setEditing(false)} />}
     </div>
   )
 }
@@ -105,7 +117,7 @@ export function HistoryView({
   onExport,
   onOpenDate,
   onOpenDay,
-  onSaveThresholds,
+  onSaveAssessment,
 }: {
   data: JournalData
   onImport: (text: string) => Promise<void>
@@ -113,7 +125,7 @@ export function HistoryView({
   onOpenDate: (iso: string) => void
   /** Open the day-detail sheet for a date. */
   onOpenDay: (iso: string) => void
-  onSaveThresholds: (value: CalendarThresholds) => Promise<void>
+  onSaveAssessment: (value: NutritionAssessmentSettings) => Promise<void>
 }) {
   const today = todayISO()
   const [filter, setFilter] = useState<Filter>('all')
@@ -127,7 +139,7 @@ export function HistoryView({
   // One pass over the journal per data change; each cell then reads its own date from the index.
   const dayIndex = useMemo(() => buildDayIndex(data), [data])
   const foods = useMemo(() => foodMap(data.foods), [data.foods])
-  const thresholds = data.settings.calendarThresholds ?? DEFAULT_THRESHOLDS
+  const config = assessmentConfig(data.settings)
   // Days before the first record are "before tracking", not "not logged".
   const firstLogged = useMemo(() => [...logged].sort()[0] ?? today, [logged, today])
   const cells = useMemo(() => monthCells(month.year, month.month), [month])
@@ -193,7 +205,7 @@ export function HistoryView({
       </div>
 
       <section className="calendar history-calendar">
-        <CalendarLegend thresholds={thresholds} onSaveThresholds={onSaveThresholds} />
+        <CalendarLegend config={config} onSaveAssessment={onSaveAssessment} />
         <div className="calendar-head">
           <button
             className="icon-btn"
@@ -222,9 +234,9 @@ export function HistoryView({
             if (!iso) return <span className="calendar-blank" key={`blank-${index}`} />
             const future = iso > today
             const tracked = !future && iso >= firstLogged
-            const day = summariseDay(dayIndex, iso, foods, thresholds)
-            const state = day.consumption.state
-            const meta = CONSUMPTION_META[state]
+            const day = summariseDay(dayIndex, iso, foods)
+            const { state } = calendarState(day.completion.status === 'complete', day.completion.skipped === 5, day.records.meals, data.foods, data.settings, iso)
+            const meta = CALENDAR_META[state]
             const water = day.waterMl == null ? null : formatTotalMl(day.waterMl).replace(' ', '\u00a0')
             const classes = [
               'hist-cell',
@@ -234,7 +246,7 @@ export function HistoryView({
             ].filter(Boolean).join(' ')
             const label = [
               formatLongDate(iso),
-              tracked ? `${meta.legend}${day.consumption.percent != null && state !== 'all-skipped' ? ` (${Math.round(day.consumption.percent)}%)` : ''}` : future ? 'future' : 'before tracking started',
+              tracked ? `nutrition: ${meta.label}` : future ? 'future' : 'before tracking started',
               `meals ${day.completion.eaten} eaten, ${day.completion.skipped} skipped, ${day.completion.notLogged} not logged`,
               day.waterMl == null ? 'no water recorded' : `water ${formatTotalMl(day.waterMl)}`,
               day.bowelMovements ? `${day.bowelMovements} bowel movement${day.bowelMovements === 1 ? '' : 's'}` : 'no bowel movement recorded',

@@ -231,5 +231,5 @@ export function summariseDay(
 
 /** Convenience for one-off use (the Diary); the calendar builds the index once per month. */
 export function summariseDate(data: JournalData, date: string): DaySummary {
-  return summariseDay(buildDayIndex(data), date, foodMap(data.foods), data.settings.calendarThresholds ?? DEFAULT_THRESHOLDS)
+  return summariseDay(buildDayIndex(data), date, foodMap(data.foods))
 }

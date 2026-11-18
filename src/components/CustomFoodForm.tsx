@@ -82,6 +82,7 @@ export function CustomFoodForm({
             unitGrams: pieceGrams.trim() && Number.isFinite(grams) && grams > 0 ? { ...initial?.unitGrams, pieces: grams } : {},
             nutrients: showLabel ? parsed : emptyNutrients(),
             nutrientSource: showLabel && LABEL_FIELDS.some((key) => parsed[key] != null) ? 'label' : 'none',
+            sourceNote: '',
             ingredients: ingredients.split(',').map((item) => item.trim()).filter(Boolean),
             isCustom: true,
           })

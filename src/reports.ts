@@ -6,6 +6,7 @@ import type { FoodGroup, JournalData, NutrientKey } from './types'
 import { totalWaterMl } from './water'
 import { buildDayIndex, DEFAULT_THRESHOLDS, SLOTS, summariseDay, type ConsumptionState } from './mealSlots'
 import type { SlotType } from './types'
+import { calendarState } from './nutritionAssessment'
 
 /**
  * Period summaries for reports: one pass over a set of days, plus a comparison with the
@@ -77,6 +78,8 @@ export type PeriodSummary = {
     byDay: { date: string; eaten: number; skipped: number; notLogged: number; percent: number | null; state: ConsumptionState }[]
     averagePercent: number | null
   }
+  /** Days by nutrition assessment; only days with all five meals recorded are assessed. */
+  nutritionDays: { within: number; below: number; above: number; insufficient: number; notAssessed: number; overUpperLimit: number }
   hydration: {
     daysRecorded: number
     daysMissing: number
@@ -191,7 +194,7 @@ export function summarisePeriod(data: JournalData, range: ReportRange): PeriodSu
   // Meal schedule and hydration, from the same per-day summaries the calendar uses
   const index = buildDayIndex(data)
   const foodsMap = new Map(data.foods.map((food) => [food.id, food]))
-  const thresholds = data.settings.calendarThresholds ?? DEFAULT_THRESHOLDS
+  const thresholds = DEFAULT_THRESHOLDS
   const daySummaries = days.map((day) => summariseDay(index, day, foodsMap, thresholds))
   const recordedDays = daySummaries.filter((day) => day.completion.status !== 'not-logged')
   const skippedBySlot = Object.fromEntries(SLOTS.map((slot) => [slot.id, 0])) as Record<SlotType, number>
@@ -204,6 +207,13 @@ export function summarisePeriod(data: JournalData, range: ReportRange): PeriodSu
   }
   const percents = daySummaries.map((day) => day.consumption.percent).filter((value): value is number => value != null)
   const waterDays = daySummaries.filter((day) => day.waterMl != null)
+  const nutritionDays = { within: 0, below: 0, above: 0, insufficient: 0, notAssessed: 0, overUpperLimit: 0 }
+  for (const day of daySummaries) {
+    const { state, nutrition } = calendarState(day.completion.status === 'complete', day.completion.skipped === 5, day.records.meals, data.foods, data.settings, day.date)
+    if (state === 'within' || state === 'below' || state === 'above' || state === 'insufficient') nutritionDays[state] += 1
+    else nutritionDays.notAssessed += 1
+    if (nutrition?.overUpperLimit.length) nutritionDays.overUpperLimit += 1
+  }
 
   return {
     range,
@@ -227,6 +237,7 @@ export function summarisePeriod(data: JournalData, range: ReportRange): PeriodSu
       })),
       averagePercent: percents.length ? percents.reduce((sum, value) => sum + value, 0) / percents.length : null,
     },
+    nutritionDays,
     hydration: {
       daysRecorded: waterDays.length,
       daysMissing: days.length - waterDays.length,
@@ -339,6 +350,10 @@ export function comparisonSections(current: PeriodSummary, previous: PeriodSumma
   ]
 
   const nutrition: CompareRow[] = [
+    row('nWithin', 'Days within reference range', current.nutritionDays.within, previous.nutritionDays.within, { digits: 0 }),
+    row('nBelow', 'Days below reference range', current.nutritionDays.below, previous.nutritionDays.below, { digits: 0 }),
+    row('nAbove', 'Days above range or an upper limit', current.nutritionDays.above, previous.nutritionDays.above, { digits: 0 }),
+    row('nNone', 'Days not assessed (meals missing or no data)', current.nutritionDays.notAssessed + current.nutritionDays.insufficient, previous.nutritionDays.notAssessed + previous.nutritionDays.insufficient, { digits: 0 }),
     ...FOOD_GROUPS.map((group) =>
       row(
         `group-${group.id}`,
@@ -410,6 +425,14 @@ export function reportHighlights(current: PeriodSummary, previous: PeriodSummary
     out.push(
       `${schedule.completeDays} of ${current.days.length} days had all 5 meals recorded${schedule.incompleteDays ? `, ${schedule.incompleteDays} partly` : ''}.` +
         (mostSkipped && mostSkipped.count ? ` ${mostSkipped.slot.label} was skipped most often (${mostSkipped.count}×).` : ''),
+    )
+  }
+  const assessedDays = current.nutritionDays.within + current.nutritionDays.below + current.nutritionDays.above
+  if (assessedDays) {
+    const n = current.nutritionDays
+    out.push(
+      `Nutrition (days with all meals recorded): ${n.within} within, ${n.below} below and ${n.above} above the reference range` +
+        (n.overUpperLimit ? `; an upper limit was exceeded on ${n.overUpperLimit} day${n.overUpperLimit === 1 ? '' : 's'}.` : '.'),
     )
   }
   if (current.hydration.daysRecorded) {

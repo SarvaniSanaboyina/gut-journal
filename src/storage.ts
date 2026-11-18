@@ -30,7 +30,7 @@ import { attachLegacyPhotos, clearLegacyPhotos } from './legacy'
 import { migrateMealType } from './meals'
 import { notifyPhotosChanged } from './photos'
 import type {
-  CalendarThresholds,
+  NutritionAssessmentSettings,
   ChildProfile,
   SlotType,
   DailyMetricEntry,
@@ -336,9 +336,9 @@ export function useJournal() {
     if (saved.removedMeals.length) notifyPhotosChanged()
   }, [])
 
-  const saveThresholds = useCallback(async (thresholds: CalendarThresholds) => {
-    const saved = await putSetting('calendar-thresholds', thresholds)
-    setData((prev) => ({ ...prev, settings: { ...prev.settings, calendarThresholds: saved } }))
+  const saveAssessment = useCallback(async (value: NutritionAssessmentSettings) => {
+    const saved = await putSetting('nutrition-assessment', value)
+    setData((prev) => ({ ...prev, settings: { ...prev.settings, nutritionAssessment: saved } }))
   }, [])
 
   const saveChildProfile = useCallback(async (profile: ChildProfile) => {
@@ -457,7 +457,7 @@ export function useJournal() {
     upsertGrowth,
     removeGrowth,
     setMealSlot,
-    saveThresholds,
+    saveAssessment,
     deleteEverything,
     saveChildProfile,
     saveReferences,

@@ -23,7 +23,8 @@ import {
   recordRevision,
 } from './validate.ts'
 
-export type NutrientSource = 'catalogue' | 'label' | 'none'
+/** ifct = one IFCT 2017 food; recipe = standard recipe from IFCT 2017 ingredients; catalogue = approximate estimate. */
+export type NutrientSource = 'ifct' | 'recipe' | 'catalogue' | 'label' | 'none'
 
 export type FoodEntry = {
   id: string
@@ -36,11 +37,13 @@ export type FoodEntry = {
   unitGrams: UnitGrams
   nutrients: Nutrients
   nutrientSource: NutrientSource
+  /** Where the values come from, e.g. the IFCT code or the recipe used. */
+  sourceNote: string
   ingredients: string[]
   isCustom: boolean
 }
 
-const NUTRIENT_SOURCES = ['catalogue', 'label', 'none'] as const
+const NUTRIENT_SOURCES = ['ifct', 'recipe', 'catalogue', 'label', 'none'] as const
 const MAX_NAME = 80
 const MAX_CUSTOM_FOODS = 2000
 
@@ -89,6 +92,7 @@ export function foodFromRow(row: FoodItem): FoodEntry {
     nutrientSource: (NUTRIENT_SOURCES as readonly string[]).includes(row.nutrientSource)
       ? (row.nutrientSource as NutrientSource)
       : 'none',
+    sourceNote: row.sourceNote,
     ingredients: asStringArray(row.ingredients),
     isCustom: row.isCustom === true,
   }
@@ -105,6 +109,7 @@ function rowData(food: Omit<FoodEntry, 'id'>) {
     unitGrams: food.unitGrams as Prisma.InputJsonValue,
     nutrients: food.nutrients as Prisma.InputJsonValue,
     nutrientSource: food.nutrientSource,
+    sourceNote: food.sourceNote,
     ingredients: food.ingredients as Prisma.InputJsonValue,
     isCustom: food.isCustom,
   }
@@ -122,7 +127,8 @@ function catalogEntry(food: CatalogFood): FoodEntry {
     defaultQty: food.defaultQty,
     unitGrams: food.unitGrams,
     nutrients: food.nutrients,
-    nutrientSource: known ? 'catalogue' : 'none',
+    nutrientSource: !known ? 'none' : food.source === 'ifct' ? 'ifct' : food.source === 'recipe' ? 'recipe' : 'catalogue',
+    sourceNote: food.compositionNote ?? (known ? 'Approximate value — not in IFCT 2017' : ''),
     ingredients: food.ingredients ?? [],
     isCustom: false,
   }
@@ -166,6 +172,7 @@ export function parseCustomFood(value: unknown, loose = false): FoodEntry {
     nutrients,
     // Custom foods only carry nutrients a parent copied from a pack label (measured values).
     nutrientSource: hasNutrients ? 'label' : 'none',
+    sourceNote: hasNutrients ? 'Entered from a pack label' : '',
     ingredients,
     isCustom: true,
   }

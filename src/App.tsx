@@ -254,7 +254,7 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
             setDate(iso)
             setDetailDate(iso)
           }}
-          onSaveThresholds={journal.saveThresholds}
+          onSaveAssessment={journal.saveAssessment}
           onImport={journal.importBackup}
           onExport={journal.exportBackup}
           onOpenDate={(iso) => {
