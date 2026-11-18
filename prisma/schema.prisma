@@ -48,6 +48,7 @@ model Meal {
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
   items              MealItem[]
+  reactions          FoodReaction[]
 
   @@index([date, time], map: "meals_date_idx")
   @@map("meals")
@@ -62,9 +63,12 @@ model Poop {
   amount    String
   straining Boolean  @default(false)
   pain      Boolean  @default(false)
-  mucus     Boolean  @default(false)
-  notes     String   @default("")
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  mucus        Boolean  @default(false)
+  visibleBlood Boolean  @default(false) @map("visible_blood")
+  hasPhoto     Boolean  @default(false) @map("has_photo")
+  notes        String   @default("")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@index([date, time], map: "poops_date_idx")
   @@map("poops")
@@ -133,6 +137,7 @@ model FoodItem {
   createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt      DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
   mealItems      MealItem[]
+  reactions      FoodReaction[]
 
   @@index([isCustom], map: "food_items_custom_idx")
   @@map("food_items")
@@ -181,4 +186,56 @@ model Setting {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@map("settings")
+}
+
+model Symptom {
+  id              String         @id
+  date            String
+  time            String
+  type            String
+  otherLabel      String         @default("") @map("other_label")
+  severity        String
+  durationMinutes Int?           @map("duration_minutes")
+  notes           String         @default("")
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  reactions       FoodReaction[]
+
+  @@index([date, time], map: "symptoms_date_idx")
+  @@map("symptoms")
+}
+
+/// A parent-recorded suspicion that a food eaten before a symptom may be related.
+/// It is an observation to keep watching, never a diagnosis.
+model FoodReaction {
+  id              String    @id
+  symptomId       String    @map("symptom_id")
+  foodItemId      String?   @map("food_item_id")
+  mealId          String?   @map("meal_id")
+  foodName        String    @map("food_name")
+  consumedDate    String    @map("consumed_date")
+  consumedTime    String    @map("consumed_time")
+  severity        String
+  previousSimilar String    @default("unsure") @map("previous_similar")
+  notes           String    @default("")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  symptom         Symptom   @relation(fields: [symptomId], references: [id], onDelete: Cascade)
+  food            FoodItem? @relation(fields: [foodItemId], references: [id], onDelete: SetNull)
+  meal            Meal?     @relation(fields: [mealId], references: [id], onDelete: SetNull)
+
+  @@index([symptomId], map: "food_reactions_symptom_idx")
+  @@index([foodItemId], map: "food_reactions_food_idx")
+  @@map("food_reactions")
+}
+
+model DailyMetric {
+  date           String   @id
+  appetite       String   @default("")
+  energy         String   @default("")
+  sleepHours     Float?   @map("sleep_hours")
+  digestionNotes String   @default("") @map("digestion_notes")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@map("daily_metrics")
 }

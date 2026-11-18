@@ -146,6 +146,52 @@ CREATE TABLE IF NOT EXISTS record_revisions (
 
 CREATE INDEX IF NOT EXISTS record_revisions_entity_idx ON record_revisions (entity, entity_id);
 
+ALTER TABLE poops ADD COLUMN IF NOT EXISTS visible_blood boolean NOT NULL DEFAULT false;
+ALTER TABLE poops ADD COLUMN IF NOT EXISTS has_photo boolean NOT NULL DEFAULT false;
+ALTER TABLE poops ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+
+CREATE TABLE IF NOT EXISTS symptoms (
+  id text PRIMARY KEY,
+  date text NOT NULL,
+  time text NOT NULL,
+  type text NOT NULL,
+  other_label text NOT NULL DEFAULT '',
+  severity text NOT NULL CHECK (severity IN ('mild', 'moderate', 'severe')),
+  duration_minutes integer CHECK (duration_minutes IS NULL OR duration_minutes BETWEEN 0 AND 10080),
+  notes text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS symptoms_date_idx ON symptoms (date, time);
+
+CREATE TABLE IF NOT EXISTS food_reactions (
+  id text PRIMARY KEY,
+  symptom_id text NOT NULL REFERENCES symptoms(id) ON DELETE CASCADE,
+  food_item_id text REFERENCES food_items(id) ON DELETE SET NULL,
+  meal_id text REFERENCES meals(id) ON DELETE SET NULL,
+  food_name text NOT NULL CHECK (length(trim(food_name)) > 0),
+  consumed_date text NOT NULL,
+  consumed_time text NOT NULL,
+  severity text NOT NULL CHECK (severity IN ('mild', 'moderate', 'severe')),
+  previous_similar text NOT NULL DEFAULT 'unsure' CHECK (previous_similar IN ('yes', 'no', 'unsure')),
+  notes text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS food_reactions_symptom_idx ON food_reactions (symptom_id);
+CREATE INDEX IF NOT EXISTS food_reactions_food_idx ON food_reactions (food_item_id);
+
+CREATE TABLE IF NOT EXISTS daily_metrics (
+  date text PRIMARY KEY,
+  appetite text NOT NULL DEFAULT '',
+  energy text NOT NULL DEFAULT '',
+  sleep_hours double precision CHECK (sleep_hours IS NULL OR sleep_hours BETWEEN 0 AND 24),
+  digestion_notes text NOT NULL DEFAULT '',
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS settings (
   key text PRIMARY KEY,
   value jsonb NOT NULL,
