@@ -12,6 +12,7 @@ import {
 } from './gut.ts'
 import { importSettings, readSettings, type Settings } from './settings.ts'
 import { type GrowthEntry, insertGrowth, parseGrowth, readGrowth } from './growth.ts'
+import { clearSkipForMeal, insertSlot, type MealSlotEntry, parseSlot, readSlots } from './mealSlots.ts'
 import {
   bad,
   type Db,
@@ -128,10 +129,12 @@ export type JournalData = {
   symptoms: SymptomEntry[]
   dailyMetrics: DailyMetricEntry[]
   growth: GrowthEntry[]
+  mealSlots: MealSlotEntry[]
   settings: Settings
 }
 
 const MAX_ENTRIES = 10000
+const MAX_EATEN_PERCENT = 300
 
 function migrateMealType(type: string): MealEntry['type'] {
   if (type === 'snack') return 'morning-snack'
@@ -231,10 +234,11 @@ function parseIngredient(value: unknown, loose: boolean): MealIngredientEntry {
   if (!name) return bad('Each food needs a name')
   const quantityServed = parseOptionalNumber(value.quantityServed, 'quantity served', 5000)
   const quantityConsumed = parseOptionalNumber(value.quantityConsumed, 'quantity eaten', 5000)
-  let consumedPercent = parseOptionalNumber(value.consumedPercent, 'amount eaten', 100)
+  // Up to 3× what was served: second helpings are recorded as eating more than the first serving.
+  let consumedPercent = parseOptionalNumber(value.consumedPercent, 'amount eaten', MAX_EATEN_PERCENT)
   if (quantityServed != null && quantityConsumed != null) {
-    if (quantityConsumed > quantityServed + 1e-9) {
-      return bad(`${name}: eaten cannot be more than served. Add second helpings to the amount served.`)
+    if (quantityConsumed > quantityServed * (MAX_EATEN_PERCENT / 100) + 1e-9) {
+      return bad(`${name}: eaten is more than three times what was served. Check the amounts.`)
     }
     // Keep a tapped quick-choice (e.g. 75%) unless the typed amounts clearly disagree with it.
     const derived = quantityServed > 0 ? (quantityConsumed / quantityServed) * 100 : consumedPercent
@@ -343,7 +347,8 @@ function parseMood(value: unknown, loose = false): MoodEntry {
 function parseWater(value: unknown, loose = false): WaterEntry {
   if (!isRecord(value)) return bad('Invalid water log')
   const amount = parseQuantity(value.amount)
-  if (amount == null || amount <= 0) return bad('A water log needs an amount')
+  // 0 is allowed: it records explicitly that no water was drunk, which differs from no entry.
+  if (amount == null) return bad('A water log needs an amount')
   return {
     id: parseId(value.id, loose),
     date: parseDate(value.date),
@@ -546,6 +551,7 @@ export async function readJournal(db: PrismaClient): Promise<JournalData> {
   const gut = await readGut(db)
   const settings = await readSettings(db)
   const growth = await readGrowth(db)
+  const mealSlots = await readSlots(db)
   const dayNotes: Record<string, string> = {}
   for (const row of notes) dayNotes[row.date] = row.note
   return {
@@ -557,6 +563,7 @@ export async function readJournal(db: PrismaClient): Promise<JournalData> {
     foods,
     ...gut,
     growth,
+    mealSlots,
     settings,
   }
 }
@@ -566,6 +573,7 @@ export async function saveMeal(db: PrismaClient, body: unknown) {
   return db.$transaction(async (tx) => {
     const existing = await tx.meal.findUnique({ where: { id: meal.id }, include: { items: true } })
     if (existing) await recordRevision(tx, 'meal', meal.id, 'update', mealFromRow(existing))
+    await clearSkipForMeal(tx, meal.date, meal.type)
     return insertMeal(tx, meal)
   })
 }
@@ -712,6 +720,7 @@ async function clearJournal(tx: Db, includeHistory = false) {
   await tx.symptom.deleteMany()
   await tx.dailyMetric.deleteMany()
   await tx.growthRecord.deleteMany()
+  await tx.mealSlot.deleteMany()
   await tx.foodItem.deleteMany({ where: { isCustom: true } })
   if (includeHistory) {
     await tx.setting.deleteMany()
@@ -768,6 +777,10 @@ export async function importJournal(db: PrismaClient, body: unknown): Promise<Jo
   const growthRaw = Array.isArray(body.growth) ? body.growth : []
   if (growthRaw.length > MAX_ENTRIES) return bad('Backup has too many growth records')
   const growth = growthRaw.map((item) => parseGrowth(item, true))
+  const slotsRaw = Array.isArray(body.mealSlots) ? body.mealSlots : []
+  if (slotsRaw.length > MAX_ENTRIES) return bad('Backup has too many meal statuses')
+  const slots = slotsRaw.map((item) => parseSlot(item))
+  const mealKeys = new Set(meals.map((meal) => `${meal.date}|${meal.type}`))
   const metrics = metricsRaw.map((item) => parseMetric(item, isRecord(item) ? item.date : null))
   const customFoods = foodsRaw
     .filter((item) => isRecord(item) && item.isCustom === true)
@@ -790,6 +803,8 @@ export async function importJournal(db: PrismaClient, body: unknown): Promise<Jo
     for (const entry of symptoms) await insertSymptom(tx, entry)
     for (const entry of metrics) await insertMetric(tx, entry)
     for (const entry of growth) await insertGrowth(tx, entry)
+    // A logged meal wins over a stale "not eaten" for the same slot.
+    for (const entry of slots) if (!mealKeys.has(`${entry.date}|${entry.mealType}`)) await insertSlot(tx, entry)
     if (isRecord(body.settings)) await importSettings(tx, body.settings)
     for (const entry of moods) await insertMood(tx, entry)
     for (const entry of waters) await insertWater(tx, entry)

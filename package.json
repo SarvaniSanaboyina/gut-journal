@@ -17,7 +17,9 @@
     "prisma:generate": "prisma generate",
     "lint": "oxlint",
     "test:api": "tsx scripts/smoke.ts",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:unit": "tsx --test scripts/*.test.ts",
+    "test": "pnpm test:unit && pnpm test:api"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.16",

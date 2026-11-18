@@ -4,6 +4,7 @@ import { formatDate, formatTime, shiftDate, todayISO } from '../dates'
 import { FOOD_GROUPS } from '../foods'
 import { BRISTOL_GROUPS, BRISTOL_TYPES, formatDurationMinutes, formatGap, stamp, symptomLabel } from '../gut'
 import { formatZ, growthAssessments, growthNotes } from '../growth'
+import { SLOTS } from '../mealSlots'
 import { formatAge, formatNutrient, NUTRIENTS, NUTRIENT_ORDER, referenceValues } from '../nutrition'
 import { summarisePeriod, type ReportRange } from '../reports'
 import { careNotices, DISCLAIMER } from '../safety'
@@ -236,7 +237,17 @@ export function DoctorReport({ data, childName, onClose }: { data: JournalData; 
               <p className="report-small">Averaged over {summary.nutrition.loggedDays} days with meals logged. “≥” means some foods had no amount or no composition data and were left out. References: {refs.note}</p>
             </>
           )}
-          {summary.eating.waterDays > 0 && <p className="report-small">Water logged on {summary.eating.waterDays} days, {Math.round(summary.eating.waterMl / summary.eating.waterDays)} ml per logged day on average.</p>}
+          <p className="report-small">
+            Meal schedule (3 meals + 2 snacks): all five recorded on {summary.schedule.completeDays} days, partly on {summary.schedule.incompleteDays}, not recorded on {summary.schedule.noLogDays}.
+            {summary.schedule.avgEaten != null && ` On recorded days, ${summary.schedule.avgEaten.toFixed(1)} meals eaten and ${summary.schedule.avgSkipped!.toFixed(1)} skipped on average.`}
+            {SLOTS.some((slot) => summary.schedule.skippedBySlot[slot.id] > 0) &&
+              ` Skipped: ${SLOTS.filter((slot) => summary.schedule.skippedBySlot[slot.id] > 0).map((slot) => `${slot.label.toLowerCase()} ${summary.schedule.skippedBySlot[slot.id]}×`).join(', ')}.`}
+          </p>
+          <p className="report-small">
+            {summary.hydration.daysRecorded
+              ? `Water: ${Math.round(summary.hydration.averageMl!)} ml per day on average over ${summary.hydration.daysRecorded} days with a record (${summary.hydration.daysMissing} days not recorded).`
+              : 'Water: not recorded in this period.'}
+          </p>
         </section>
 
         {summary.checkIns.days > 0 && (

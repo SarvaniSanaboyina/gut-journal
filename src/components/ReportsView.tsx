@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
 import {
   formatMonthRange,
+  formatLongDate,
   formatShortDate,
+  formatWeekday,
   formatWeekRange,
   mondayOf,
   monthDates,
@@ -14,17 +16,23 @@ import {
   weekDates,
 } from '../dates'
 import { formatGap } from '../gut'
+import { SLOTS } from '../mealSlots'
 import { buildPeriodReport } from '../meals'
 import { comparisonSections, previousRange, reportHighlights, summarisePeriod, type CompareRow, type ReportRange } from '../reports'
 import { DISCLAIMER } from '../safety'
 import type { ChildProfile, GrowthEntry, JournalData, MealEntry, PoopEntry, SymptomEntry } from '../types'
-import { BarList } from './Charts'
+import { BarList, ColumnChart } from './Charts'
 import { DoctorReport } from './DoctorReport'
 import { GrowthView } from './GrowthView'
 import { Chevron } from './Icons'
 import { TimelineView } from './TimelineView'
 
 type Tab = 'summary' | 'timeline' | 'growth'
+
+function columnLabel(date: string, index: number, count: number) {
+  if (count <= 14) return formatWeekday(date)
+  return index % 5 === 0 || index === count - 1 ? String(Number(date.slice(8))) : ''
+}
 type Period = 'week' | 'month' | 'custom'
 
 function CompareTable({ title, rows, currentLabel, previousLabel }: { title: string; rows: CompareRow[]; currentLabel: string; previousLabel: string }) {
@@ -161,6 +169,71 @@ function Summary({ data, date, onChangeDate }: { data: JournalData; date: string
           </div>
         </div>
         <ul className="observations">{highlights.map((item) => <li key={item}>{item}</li>)}</ul>
+      </section>
+
+      <CompareTable title="Meal tracking" rows={sections.schedule} currentLabel={thisLabel} previousLabel={period === 'custom' ? 'Before' : 'Previous'} />
+      <p className="muted-note report-note">Averages use only days with at least one meal recorded — unrecorded meals are not counted as skipped.</p>
+
+      <section className="section">
+        <ColumnChart
+          title="Meals recorded per day"
+          subtitle="Eaten and explicitly skipped, out of 5 scheduled meals"
+          unit="meals"
+          series={[
+            { id: 'eaten', label: 'Eaten', color: '#2a78d6' },
+            { id: 'skipped', label: 'Not eaten', color: '#eb6834' },
+          ]}
+          columns={summary.schedule.byDay.map((day, index) => ({
+            key: day.date,
+            label: columnLabel(day.date, index, summary.days.length),
+            full: formatLongDate(day.date),
+            values: { eaten: day.eaten, skipped: day.skipped },
+            missing: day.notLogged === 5,
+          }))}
+        />
+      </section>
+
+      <section className="section">
+        <ColumnChart
+          title="Share of served food eaten"
+          subtitle="Days with all 5 meals recorded and amounts known; a skipped meal counts as 0%"
+          unit="%"
+          series={[{ id: 'percent', label: 'Eaten', color: '#1baf7a' }]}
+          columns={summary.schedule.byDay.map((day, index) => ({
+            key: day.date,
+            label: columnLabel(day.date, index, summary.days.length),
+            full: formatLongDate(day.date),
+            values: { percent: day.percent ?? 0 },
+            missing: day.percent == null,
+          }))}
+        />
+      </section>
+
+      {SLOTS.some((slot) => summary.schedule.skippedBySlot[slot.id] > 0) && (
+        <section className="section">
+          <BarList
+            title="Skipped meals by slot"
+            subtitle="Times each meal was marked Not eaten"
+            rows={SLOTS.map((slot) => ({ key: slot.id, label: slot.label, text: slot.label, value: summary.schedule.skippedBySlot[slot.id], color: '#eb6834' }))}
+          />
+        </section>
+      )}
+
+      <CompareTable title="Hydration" rows={sections.hydration} currentLabel={thisLabel} previousLabel={period === 'custom' ? 'Before' : 'Previous'} />
+      <section className="section">
+        <ColumnChart
+          title="Water per day"
+          subtitle="Plain water only; a dash means no water was recorded that day"
+          unit="ml"
+          series={[{ id: 'ml', label: 'Water', color: '#2a78d6' }]}
+          columns={summary.hydration.byDay.map((day, index) => ({
+            key: day.date,
+            label: columnLabel(day.date, index, summary.days.length),
+            full: formatLongDate(day.date),
+            values: { ml: day.ml ?? 0 },
+            missing: day.ml == null,
+          }))}
+        />
       </section>
 
       <CompareTable title="Eating habits" rows={sections.eating} currentLabel={thisLabel} previousLabel={period === 'custom' ? 'Before' : 'Previous'} />

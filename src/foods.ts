@@ -39,6 +39,7 @@ export const FOOD_UNITS: { id: FoodUnit; label: string; singular: string }[] = [
 
 /** Quick consumption choices. `null` percent keeps "not recorded". */
 export const CONSUMPTION_CHOICES: { percent: number; label: string; short: string }[] = [
+  { percent: 150, label: 'Had more than served (second helping)', short: 'More' },
   { percent: 100, label: 'Ate everything', short: 'All' },
   { percent: 75, label: 'Ate most', short: 'Most' },
   { percent: 50, label: 'Ate half', short: 'Half' },
@@ -142,6 +143,7 @@ export function wasEaten(item: MealIngredient): boolean {
 
 export function consumptionLabel(percent: number | null): string {
   if (percent == null) return 'Amount eaten not recorded'
+  if (percent > 100) return 'Had more than served'
   if (percent >= 100) return 'Ate everything'
   if (percent >= 70) return 'Ate most'
   if (percent >= 40) return 'Ate half'

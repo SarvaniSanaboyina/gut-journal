@@ -126,11 +126,15 @@ CREATE TABLE IF NOT EXISTS meal_items (
   quantity_served double precision CHECK (quantity_served IS NULL OR quantity_served >= 0),
   quantity_consumed double precision CHECK (quantity_consumed IS NULL OR quantity_consumed >= 0),
   unit text NOT NULL,
-  consumed_percent smallint CHECK (consumed_percent IS NULL OR consumed_percent BETWEEN 0 AND 100),
+  consumed_percent smallint CHECK (consumed_percent IS NULL OR consumed_percent BETWEEN 0 AND 300),
   preparation text NOT NULL DEFAULT '',
   notes text NOT NULL DEFAULT '',
   position integer NOT NULL DEFAULT 0
 );
+
+-- Second helpings: eaten may exceed served (up to 3x). Widen the check on existing databases.
+ALTER TABLE meal_items DROP CONSTRAINT IF EXISTS meal_items_consumed_percent_check;
+ALTER TABLE meal_items ADD CONSTRAINT meal_items_consumed_percent_check CHECK (consumed_percent IS NULL OR consumed_percent BETWEEN 0 AND 300);
 
 CREATE INDEX IF NOT EXISTS meal_items_meal_idx ON meal_items (meal_id);
 CREATE INDEX IF NOT EXISTS meal_items_food_idx ON meal_items (food_item_id);
@@ -190,6 +194,16 @@ CREATE TABLE IF NOT EXISTS daily_metrics (
   sleep_hours double precision CHECK (sleep_hours IS NULL OR sleep_hours BETWEEN 0 AND 24),
   digestion_notes text NOT NULL DEFAULT '',
   updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS meal_slots (
+  date text NOT NULL,
+  meal_type text NOT NULL CHECK (meal_type IN ('breakfast', 'morning-snack', 'lunch', 'evening-snack', 'dinner')),
+  status text NOT NULL CHECK (status IN ('not-eaten')),
+  note text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (date, meal_type)
 );
 
 CREATE TABLE IF NOT EXISTS growth_records (

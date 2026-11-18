@@ -4,12 +4,14 @@ import { bad, type Db, isRecord, oneOf, parseDate, parseOptionalNumber, recordRe
 
 export type ChildProfile = { sex: '' | 'female' | 'male'; birthDate: string }
 export type NutrientReferences = { custom: Partial<Record<NutrientKey, number>> }
-export type Settings = { childProfile: ChildProfile; nutrientReferences: NutrientReferences }
+/** Day-consumption percentage bands for the history calendar (below `lessBelow` = less, above `moreAbove` = more). */
+export type CalendarThresholds = { lessBelow: number; moreAbove: number }
+export type Settings = { childProfile: ChildProfile; nutrientReferences: NutrientReferences; calendarThresholds: CalendarThresholds }
 
-const KEYS = { 'child-profile': 'childProfile', 'nutrient-references': 'nutrientReferences' } as const
+const KEYS = { 'child-profile': 'childProfile', 'nutrient-references': 'nutrientReferences', 'calendar-thresholds': 'calendarThresholds' } as const
 
 export function defaultSettings(): Settings {
-  return { childProfile: { sex: '', birthDate: '' }, nutrientReferences: { custom: {} } }
+  return { childProfile: { sex: '', birthDate: '' }, nutrientReferences: { custom: {} }, calendarThresholds: { lessBelow: 50, moreAbove: 100 } }
 }
 
 function parseProfile(value: unknown): ChildProfile {
@@ -30,8 +32,19 @@ function parseReferences(value: unknown): NutrientReferences {
   return { custom }
 }
 
+function parseThresholds(value: unknown): CalendarThresholds {
+  if (!isRecord(value)) return bad('Invalid thresholds')
+  const lessBelow = parseOptionalNumber(value.lessBelow, 'lower threshold', 300)
+  const moreAbove = parseOptionalNumber(value.moreAbove, 'upper threshold', 300)
+  if (lessBelow == null || moreAbove == null) return bad('Both thresholds are needed')
+  if (lessBelow > moreAbove) return bad('The “less” threshold must not be above the “more” threshold')
+  return { lessBelow, moreAbove }
+}
+
 function parse(key: keyof typeof KEYS, value: unknown) {
-  return key === 'child-profile' ? parseProfile(value) : parseReferences(value)
+  if (key === 'child-profile') return parseProfile(value)
+  if (key === 'calendar-thresholds') return parseThresholds(value)
+  return parseReferences(value)
 }
 
 export async function readSettings(db: Db): Promise<Settings> {
@@ -41,6 +54,7 @@ export async function readSettings(db: Db): Promise<Settings> {
     try {
       if (row.key === 'child-profile') settings.childProfile = parseProfile(row.value)
       if (row.key === 'nutrient-references') settings.nutrientReferences = parseReferences(row.value)
+      if (row.key === 'calendar-thresholds') settings.calendarThresholds = parseThresholds(row.value)
     } catch {
       // A malformed stored value falls back to the defaults rather than breaking the journal.
     }
@@ -68,4 +82,5 @@ export async function importSettings(db: Db, value: unknown) {
   await db.setting.deleteMany()
   if (value.childProfile) await writeSetting(db, 'child-profile', value.childProfile)
   if (value.nutrientReferences) await writeSetting(db, 'nutrient-references', value.nutrientReferences)
+  if (value.calendarThresholds) await writeSetting(db, 'calendar-thresholds', value.calendarThresholds)
 }

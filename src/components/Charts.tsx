@@ -71,7 +71,8 @@ export function ColumnChart({
   title: string
   subtitle?: string
   series: Series[]
-  columns: { key: string; label: string; full: string; values: Record<string, number> }[]
+  /** `missing` marks a column with no record: drawn as a dash and listed as "not recorded", never as zero. */
+  columns: { key: string; label: string; full: string; values: Record<string, number>; missing?: boolean }[]
   unit?: string
   /** Optional horizontal reference line on the same axis (e.g. a daily reference value). */
   reference?: { value: number; label: string }
@@ -80,7 +81,7 @@ export function ColumnChart({
   const totals = columns.map((column) => series.reduce((sum, item) => sum + (column.values[item.id] ?? 0), 0))
   const max = Math.max(1, ...totals, reference?.value ?? 0)
   const fmt = (value: number) => `${Math.round(value * 10) / 10}${unit ? ` ${unit}` : ''}`
-  const peak = totals.indexOf(Math.max(...totals))
+  const peak = totals.indexOf(Math.max(...totals.filter((_, index) => !columns[index].missing)))
   return (
     <ChartFrame
       title={title}
@@ -88,11 +89,11 @@ export function ColumnChart({
       legend={series}
       table={{
         head: ['', ...(series.length > 1 ? series.map((item) => item.label) : []), 'Total'],
-        rows: columns.map((column, index) => [
-          column.full,
-          ...(series.length > 1 ? series.map((item) => fmt(column.values[item.id] ?? 0)) : []),
-          fmt(totals[index]),
-        ]),
+        rows: columns.map((column, index) =>
+          column.missing
+            ? [column.full, ...(series.length > 1 ? series.map(() => '—') : []), 'not recorded']
+            : [column.full, ...(series.length > 1 ? series.map((item) => fmt(column.values[item.id] ?? 0)) : []), fmt(totals[index])],
+        ),
       }}
     >
       <div className="columns" style={{ ['--cols' as string]: columns.length }} onMouseLeave={() => setActive(null)}>
@@ -108,13 +109,14 @@ export function ColumnChart({
               key={column.key}
               type="button"
               className={`column ${active === column.key ? 'active' : ''}`}
-              aria-label={`${column.full}: ${fmt(total)}`}
+              aria-label={`${column.full}: ${column.missing ? 'not recorded' : fmt(total)}`}
               onMouseEnter={() => setActive(column.key)}
               onFocus={() => setActive(column.key)}
               onBlur={() => setActive(null)}
             >
-              <span className="column-plot">
-                {(index === peak && total > 0) || active === column.key ? <span className="column-value">{fmt(total)}</span> : null}
+              <span className="column-plot" style={{ ['--h' as string]: `${(total / max) * 100}%` }}>
+                {column.missing && <span className="column-missing" aria-hidden="true">–</span>}
+                {!column.missing && ((index === peak && total > 0) || active === column.key) ? <span className="column-value">{fmt(total)}</span> : null}
                 <span className="column-stack" style={{ height: `${(total / max) * 100}%` }}>
                   {series.map((item) => {
                     const value = column.values[item.id] ?? 0

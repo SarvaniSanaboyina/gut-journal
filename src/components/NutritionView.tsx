@@ -103,7 +103,7 @@ function ProfileForm({
     () => Object.fromEntries(NUTRIENT_ORDER.map((key) => [key, settings.nutrientReferences.custom[key] != null ? String(settings.nutrientReferences.custom[key]) : ''])) as Record<NutrientKey, string>,
   )
   const [error, setError] = useState<string | null>(null)
-  const preview = referenceValues({ childProfile: { sex, birthDate }, nutrientReferences: { custom: {} } }, todayISO())
+  const preview = referenceValues({ ...settings, childProfile: { sex, birthDate }, nutrientReferences: { custom: {} } }, todayISO())
 
   return (
     <form

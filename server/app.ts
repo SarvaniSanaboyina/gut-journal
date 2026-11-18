@@ -36,6 +36,7 @@ import { removeCustomFood, saveCustomFood } from './foods.ts'
 import { removeSymptom, saveMetric, saveSymptom } from './gut.ts'
 import { saveSetting } from './settings.ts'
 import { removeGrowth, saveGrowth } from './growth.ts'
+import { setSlotStatus } from './mealSlots.ts'
 
 const JSON_LIMIT = '32mb'
 const PHOTO_LIMIT = '8mb'
@@ -237,6 +238,10 @@ export function createApp(prisma: PrismaClient, options: { distDir?: string } = 
   app.delete('/api/foods/:id', async (req, res) => {
     await removeCustomFood(prisma, param(req.params.id))
     res.status(204).end()
+  })
+
+  app.put('/api/meal-slots/:date/:mealType', async (req, res) => {
+    res.json(await setSlotStatus(prisma, param(req.params.date), param(req.params.mealType), req.body))
   })
 
   app.put('/api/growth', async (req, res) => {

@@ -76,8 +76,11 @@ try {
   check('ingredient nested', saved.json.items[1]?.ingredients?.[0]?.name === 'Drumstick')
   check('percent derived from quantities', saved.json.items[0]?.consumedPercent === 75)
 
-  const tooMuch = await call('PUT', '/api/meals', { ...meal, id: 'meal-2', items: [{ ...meal.items[0], id: 'x1', quantityConsumed: 3 }] })
-  check('eaten > served rejected', tooMuch.status === 400, tooMuch.json)
+  const tooMuch = await call('PUT', '/api/meals', { ...meal, id: 'meal-2', items: [{ ...meal.items[0], id: 'x1', quantityConsumed: 7, consumedPercent: null }] })
+  check('eaten > 3x served rejected', tooMuch.status === 400, tooMuch.json)
+  const seconds = await call('PUT', '/api/meals', { ...meal, id: 'meal-2', type: 'dinner', items: [{ ...meal.items[0], id: 'x1', quantityConsumed: 3, consumedPercent: null }] })
+  check('second helpings (150%) accepted', seconds.status === 200 && seconds.json.items[0].consumedPercent === 150, seconds.json)
+  await call('DELETE', '/api/meals/meal-2')
   const empty = await call('PUT', '/api/meals', { ...meal, id: 'meal-3', items: [] })
   check('meal without foods rejected', empty.status === 400)
   const badDate = await call('PUT', '/api/meals', { ...meal, id: 'meal-4', date: '2026-02-30' })
@@ -130,6 +133,38 @@ try {
   const unknown = await call('PUT', '/api/settings/theme', {})
   check('unknown setting rejected', unknown.status === 400)
 
+  // Meal schedule: explicit "not eaten" slots
+  const skip = await call('PUT', '/api/meal-slots/2026-11-18/lunch', { status: 'not-eaten', note: 'asleep' })
+  check('slot marked not eaten', skip.status === 200 && skip.json.status === 'not-eaten')
+  const skipTaken = await call('PUT', '/api/meal-slots/2026-11-18/breakfast', { status: 'not-eaten' })
+  check('not eaten refused while food is logged', skipTaken.status === 400)
+  const badSlot = await call('PUT', '/api/meal-slots/2026-11-18/mini-snack', { status: 'not-eaten' })
+  check('"Other" is not a scheduled slot', badSlot.status === 400)
+  const badStatus = await call('PUT', '/api/meal-slots/2026-11-18/lunch', { status: 'eaten' })
+  check('eaten cannot be set directly', badStatus.status === 400)
+  const lunch = await call('PUT', '/api/meals', { ...meal, id: 'meal-lunch', type: 'lunch', time: '12:30', items: [{ ...meal.items[0], id: 'l1' }] })
+  const afterLunch = await call('GET', '/api/journal')
+  check('logging food clears not eaten', lunch.status === 200 && !afterLunch.json.mealSlots.some((slot: any) => slot.mealType === 'lunch'))
+  const replace = await call('PUT', '/api/meal-slots/2026-11-18/lunch', { status: 'not-eaten', replaceMeals: true })
+  const afterReplace = await call('GET', '/api/journal')
+  check(
+    'confirmed not eaten replaces logged food',
+    replace.status === 200 && replace.json.removedMeals[0] === 'meal-lunch' && !afterReplace.json.meals.some((m: any) => m.id === 'meal-lunch'),
+  )
+  check('replaced meal kept a revision', (await db.prisma.recordRevision.count({ where: { entity: 'meal', entityId: 'meal-lunch', action: 'delete' } })) === 1)
+  await call('PUT', '/api/meal-slots/2026-11-18/dinner', { status: 'not-eaten' })
+  const cleared = await call('PUT', '/api/meal-slots/2026-11-18/dinner', { status: 'not-logged' })
+  const afterClear = await call('GET', '/api/journal')
+  check('slot reset to not logged', cleared.status === 200 && afterClear.json.mealSlots.length === 1)
+  const thresholds = await call('PUT', '/api/settings/calendar-thresholds', { lessBelow: 40, moreAbove: 110 })
+  check('calendar thresholds saved', thresholds.status === 200 && thresholds.json.lessBelow === 40)
+  const badThresholds = await call('PUT', '/api/settings/calendar-thresholds', { lessBelow: 120, moreAbove: 100 })
+  check('inverted thresholds rejected', badThresholds.status === 400)
+  const zeroWater = await call('PUT', '/api/waters', { id: 'w0', date: '2026-11-18', time: '20:00', amount: 0, unit: 'ml' })
+  check('explicit 0 ml water accepted', zeroWater.status === 200 && zeroWater.json.amount === 0)
+  const negativeWater = await call('PUT', '/api/waters', { id: 'w1', date: '2026-11-18', time: '20:00', amount: -5, unit: 'ml' })
+  check('negative water rejected', negativeWater.status === 400)
+
   // Phase 4: growth records
   const growth = await call('PUT', '/api/growth', { id: 'g-1', date: '2025-05-04', weightKg: 12.2, heightCm: 86.4, position: 'standing' })
   check('growth record saved', growth.status === 200 && growth.json.heightCm === 86.4 && growth.json.position === 'standing')
@@ -149,6 +184,7 @@ try {
   check('backup round-trip keeps symptoms', restored.json.symptoms[0]?.reactions?.length === 1 && restored.json.dailyMetrics.length === 1)
   check('backup round-trip keeps settings', restored.json.settings.childProfile.birthDate === '2023-05-04')
   check('backup round-trip keeps blood flag', restored.json.poops[0]?.visibleBlood === true)
+  check('backup round-trip keeps not-eaten slots and thresholds', restored.json.mealSlots.length === 1 && restored.json.settings.calendarThresholds.moreAbove === 110)
   check('backup round-trip keeps growth', restored.json.growth.length === 1 && restored.json.growth[0].weightKg === 12.4)
 
   const refuseWipe = await call('POST', '/api/delete-all', {})
@@ -156,7 +192,7 @@ try {
   const wiped = await call('POST', '/api/delete-all', { confirm: 'DELETE' })
   check(
     'delete-all clears journal',
-    wiped.status === 200 && wiped.json.meals.length === 0 && wiped.json.poops.length === 0 && wiped.json.symptoms.length === 0 && wiped.json.growth.length === 0 && wiped.json.foods.every((f: any) => !f.isCustom),
+    wiped.status === 200 && wiped.json.meals.length === 0 && wiped.json.poops.length === 0 && wiped.json.symptoms.length === 0 && wiped.json.growth.length === 0 && wiped.json.mealSlots.length === 0 && wiped.json.foods.every((f: any) => !f.isCustom),
   )
   check('delete-all clears settings', wiped.json.settings.childProfile.birthDate === '')
   check('delete-all clears edit history and photos', (await db.prisma.recordRevision.count()) === 0 && (await db.prisma.mealPhoto.count()) === 0)

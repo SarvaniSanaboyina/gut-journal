@@ -1,13 +1,16 @@
+import { useMemo } from 'react'
 import { moodMeta } from '../constants'
 import { bristolGroup, bristolGroupMeta } from '../gut'
 import { careNotices } from '../safety'
 import { formatTime } from '../dates'
 import { formatCalories, hasCalories, totalCalories } from '../meals'
-import type { JournalData, MealEntry, MoodEntry, PoopEntry, SymptomEntry, WaterEntry } from '../types'
+import { summariseDate } from '../mealSlots'
+import type { JournalData, MealEntry, MoodEntry, PoopEntry, SlotType, SymptomEntry, WaterEntry } from '../types'
 import { formatTotalMl, formatWater, totalWaterMl } from '../water'
 import { CareNotices, PoopRow, SymptomRow } from './GutEntries'
 import { MoodFace, WaterDrop } from './Icons'
 import { MealCard } from './MealCard'
+import { MealSchedule } from './MealSchedule'
 
 function byTime<T extends { time: string }>(items: T[]) {
   return [...items].sort((a, b) => a.time.localeCompare(b.time))
@@ -30,6 +33,9 @@ export function TodayView({
   onEditWater,
   onNoteChange,
   onNoteBlur,
+  onLogSlot,
+  onSkipSlot,
+  onClearSlot,
 }: {
   date: string
   name: string
@@ -47,7 +53,11 @@ export function TodayView({
   onEditWater: (entry: WaterEntry) => void
   onNoteChange: (note: string) => void
   onNoteBlur: () => void
+  onLogSlot: (type: SlotType) => void
+  onSkipSlot: (type: SlotType) => void
+  onClearSlot: (type: SlotType) => void
 }) {
+  const daySummary = useMemo(() => summariseDate(data, date), [data, date])
   const meals = byTime(data.meals.filter((item) => item.date === date))
   const poops = byTime(data.poops.filter((item) => item.date === date))
   const moods = byTime(data.moods.filter((item) => item.date === date))
@@ -86,6 +96,8 @@ export function TodayView({
 
       <CareNotices notices={notices} />
 
+      <MealSchedule summary={daySummary} onLog={onLogSlot} onEditMeal={onEditMeal} onSkip={onSkipSlot} onClearSkip={onClearSlot} />
+
       <div className="summary">
         <div className="summary-card">
           <span>Meals</span>
@@ -108,7 +120,7 @@ export function TodayView({
       <section className="section">
         <div className="section-head">
           <div>
-            <h3>Meals & snacks</h3>
+            <h3>All meal entries</h3>
             <p>
               {caloriesLogged
                 ? `${formatCalories(calorieTotal)} today`

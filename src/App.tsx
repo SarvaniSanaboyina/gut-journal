@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from './auth'
 import { AccountMenu } from './components/AccountMenu'
 import { DataPanel } from './components/DataPanel'
+import { DayDetail } from './components/DayDetail'
 import { AuthScreen } from './components/AuthScreen'
 import { HistoryView } from './components/HistoryView'
 import { Chevron } from './components/Icons'
@@ -18,14 +19,14 @@ import { PoopForm } from './components/PoopForm'
 import { TodayView } from './components/TodayView'
 import { WaterForm } from './components/WaterForm'
 import { ReportsView } from './components/ReportsView'
-import { journalTitle } from './constants'
+import { journalTitle, mealLabel } from './constants'
 import { formatLongDate, isToday, shiftDate, todayISO } from './dates'
 import { useJournal } from './storage'
-import type { MealEntry, MoodEntry, PoopEntry, SymptomEntry, WaterEntry } from './types'
+import type { MealEntry, MoodEntry, PoopEntry, SlotType, SymptomEntry, WaterEntry } from './types'
 
 type View = 'today' | 'gut' | 'nutrition' | 'reports' | 'history'
 type Editor =
-  | { kind: 'meal'; entry?: MealEntry }
+  | { kind: 'meal'; entry?: MealEntry; type?: SlotType }
   | { kind: 'poop'; entry?: PoopEntry }
   | { kind: 'mood'; entry?: MoodEntry }
   | { kind: 'water'; entry?: WaterEntry }
@@ -96,6 +97,18 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
   const [birthDateOpen, setBirthDateOpen] = useState(false)
   const [foodsOpen, setFoodsOpen] = useState(false)
   const [dataOpen, setDataOpen] = useState(false)
+  const [detailDate, setDetailDate] = useState<string | null>(null)
+
+  /** Mark a scheduled meal Not eaten. If food is logged for it, ask before replacing that food. */
+  const markNotEaten = async (mealDate: string, type: SlotType) => {
+    const logged = journal.data.meals.filter((meal) => meal.date === mealDate && meal.type === type)
+    if (logged.length) {
+      const what = logged.length === 1 ? 'The food logged' : `All ${logged.length} entries logged`
+      if (!window.confirm(`${what} for ${mealLabel(type).toLowerCase()} on this day will be removed and the meal marked Not eaten. Continue?`)) return false
+    }
+    await journal.setMealSlot(mealDate, type, { status: 'not-eaten', replaceMeals: logged.length > 0 })
+    return true
+  }
 
   const title = useMemo(() => {
     if (isToday(date)) return 'Today'
@@ -188,6 +201,9 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
           onCheckIn={() => setEditor({ kind: 'checkin' })}
           onEditSymptom={(entry) => setEditor({ kind: 'symptom', entry })}
           onEditMeal={(entry) => setEditor({ kind: 'meal', entry })}
+          onLogSlot={(type) => setEditor({ kind: 'meal', type })}
+          onSkipSlot={(type) => void markNotEaten(date, type).catch((error: unknown) => window.alert(error instanceof Error ? error.message : 'Could not save'))}
+          onClearSlot={(type) => void persist(() => journal.setMealSlot(date, type, { status: 'not-logged' }))}
           onEditPoop={(entry) => setEditor({ kind: 'poop', entry })}
           onEditMood={(entry) => setEditor({ kind: 'mood', entry })}
           onEditWater={(entry) => setEditor({ kind: 'water', entry })}
@@ -234,6 +250,11 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
       {journal.status === 'ready' && view === 'history' && (
         <HistoryView
           data={journal.data}
+          onOpenDay={(iso) => {
+            setDate(iso)
+            setDetailDate(iso)
+          }}
+          onSaveThresholds={journal.saveThresholds}
           onImport={journal.importBackup}
           onExport={journal.exportBackup}
           onOpenDate={(iso) => {
@@ -243,7 +264,7 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
         />
       )}
 
-      <nav className="tabs" hidden={Boolean(editor) || birthDateOpen || foodsOpen || dataOpen || journal.status !== 'ready'}>
+      <nav className="tabs" hidden={Boolean(editor) || birthDateOpen || foodsOpen || dataOpen || Boolean(detailDate) || journal.status !== 'ready'}>
         <button className={view === 'today' ? 'active' : ''} onClick={() => setView('today')}>
           Diary
         </button>
@@ -266,6 +287,10 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
           <MealForm
             date={date}
             initial={editor.entry}
+            defaultType={editor.type}
+            onNotEaten={async (mealDate, type) => {
+              if (await markNotEaten(mealDate, type)) setEditor(null)
+            }}
             meals={journal.data.meals}
             foods={journal.data.foods}
             onSaveFood={journal.upsertFood}
@@ -381,6 +406,29 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
             initial={journal.data.dailyMetrics.find((item) => item.date === date)}
             onSave={(entry) => journal.saveDailyMetric(entry).then(() => setEditor(null))}
             onCancel={() => setEditor(null)}
+          />
+        </Modal>
+      )}
+
+      {detailDate && (
+        <Modal title="Day details" onClose={() => setDetailDate(null)}>
+          <DayDetail
+            data={journal.data}
+            date={detailDate}
+            onLogSlot={(type) => setEditor({ kind: 'meal', type })}
+            onSkipSlot={(type) => void markNotEaten(detailDate, type).catch((error: unknown) => window.alert(error instanceof Error ? error.message : 'Could not save'))}
+            onClearSlot={(type) => void persist(() => journal.setMealSlot(detailDate, type, { status: 'not-logged' }))}
+            onEditMeal={(entry) => setEditor({ kind: 'meal', entry })}
+            onAddWater={() => setEditor({ kind: 'water' })}
+            onEditWater={(entry) => setEditor({ kind: 'water', entry })}
+            onAddPoop={() => setEditor({ kind: 'poop' })}
+            onEditPoop={(entry) => setEditor({ kind: 'poop', entry })}
+            onEditSymptom={(entry) => setEditor({ kind: 'symptom', entry })}
+            onOpenDiary={() => {
+              setDate(detailDate)
+              setDetailDate(null)
+              setView('today')
+            }}
           />
         </Modal>
       )}

@@ -211,7 +211,27 @@ export interface JournalData {
   symptoms: SymptomEntry[]
   dailyMetrics: DailyMetricEntry[]
   growth: GrowthEntry[]
+  mealSlots: MealSlotEntry[]
   settings: Settings
+}
+
+/** The five scheduled meals every day ("Other" meals are extra and not a slot). */
+export type SlotType = 'breakfast' | 'morning-snack' | 'lunch' | 'evening-snack' | 'dinner'
+export type SlotStatus = 'not-logged' | 'eaten' | 'not-eaten'
+
+/** Stored only for an explicit "not eaten"; "eaten" comes from meal entries. */
+export interface MealSlotEntry {
+  date: string
+  mealType: SlotType
+  status: 'not-eaten'
+  note: string
+}
+
+export interface CalendarThresholds {
+  /** Day consumption below this percentage shows as "less". */
+  lessBelow: number
+  /** Day consumption above this percentage shows as "more than usual". */
+  moreAbove: number
 }
 
 export type MeasurePosition = '' | 'lying' | 'standing'
@@ -234,6 +254,7 @@ export interface ChildProfile {
 export interface Settings {
   childProfile: ChildProfile
   nutrientReferences: { custom: Partial<Record<NutrientKey, number>> }
+  calendarThresholds: CalendarThresholds
 }
 
 export const emptyJournal = (): JournalData => ({
@@ -246,5 +267,6 @@ export const emptyJournal = (): JournalData => ({
   symptoms: [],
   dailyMetrics: [],
   growth: [],
-  settings: { childProfile: { sex: '', birthDate: '' }, nutrientReferences: { custom: {} } },
+  mealSlots: [],
+  settings: { childProfile: { sex: '', birthDate: '' }, nutrientReferences: { custom: {} }, calendarThresholds: { lessBelow: 50, moreAbove: 100 } },
 })

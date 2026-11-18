@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { MEAL_CONSISTENCIES, MEAL_TYPES } from '../constants'
+import { MEAL_CONSISTENCIES, MEAL_TYPES, mealLabel } from '../constants'
 import { defaultMealType, nowTime } from '../dates'
 import {
   CONSUMPTION_CHOICES,
@@ -18,8 +18,9 @@ import {
   searchFoods,
 } from '../foods'
 import { formatDuration, mealDurationMinutes } from '../meals'
+import { isSlotType } from '../mealSlots'
 import { compressImage, deletePhoto, putPhoto } from '../photos'
-import type { FoodEntry, FoodUnit, MealConsistency, MealEntry, MealItem, MealSource, MealType } from '../types'
+import type { FoodEntry, FoodUnit, MealConsistency, MealEntry, MealItem, MealSource, MealType, SlotType } from '../types'
 import { CustomFoodForm } from './CustomFoodForm'
 import { FoodPicker } from './FoodPicker'
 import { PhotoSlot } from './MealPhotos'
@@ -156,7 +157,7 @@ function ItemEditor({
                 onChange({
                   ...item,
                   quantityConsumed: value,
-                  consumedPercent: value != null && served ? Math.min(100, Math.round((value / served) * 100)) : item.consumedPercent,
+                  consumedPercent: value != null && served ? Math.min(300, Math.round((value / served) * 100)) : item.consumedPercent,
                 })
               }}
             />
@@ -251,6 +252,8 @@ export function MealForm({
   onSave,
   onDelete,
   onCancel,
+  defaultType,
+  onNotEaten,
 }: {
   date: string
   initial?: MealEntry
@@ -260,10 +263,14 @@ export function MealForm({
   onSave: (entry: MealEntry) => void | Promise<void>
   onDelete?: () => void
   onCancel: () => void
+  /** Preselect a meal type (e.g. when logging from a meal schedule slot). */
+  defaultType?: MealType
+  /** Record the selected scheduled meal as "Not eaten" instead of logging food. */
+  onNotEaten?: (date: string, type: SlotType) => Promise<void>
 }) {
   const [date, setDate] = useState(initial?.date ?? initialDate)
   const [time, setTime] = useState(initial?.time ?? nowTime())
-  const [type, setType] = useState<MealType>(initial?.type ?? defaultMealType())
+  const [type, setType] = useState<MealType>(initial?.type ?? defaultType ?? defaultMealType())
   const [endTime, setEndTime] = useState(initial?.endTime ?? '')
   const [items, setItems] = useState<MealItem[]>(initial?.items ?? [])
   const [legacyFoods, setLegacyFoods] = useState(initial && initial.items.length === 0 ? initial.foods : '')
@@ -364,6 +371,30 @@ export function MealForm({
             </button>
           ))}
         </div>
+
+        {onNotEaten && isSlotType(type) && (
+          <div className="not-eaten-row">
+            <span>{initial ? `Was ${mealLabel(type).toLowerCase()} actually skipped?` : `Didn’t eat ${mealLabel(type).toLowerCase()}?`}</span>
+            <button
+              type="button"
+              className="slot-btn"
+              disabled={saving}
+              onClick={async () => {
+                setSaving(true)
+                setError(null)
+                try {
+                  await onNotEaten(date, type)
+                } catch (skipError) {
+                  setError(skipError instanceof Error ? skipError.message : 'Could not save')
+                } finally {
+                  setSaving(false)
+                }
+              }}
+            >
+              Mark not eaten
+            </button>
+          </div>
+        )}
 
         <div className="time-pair">
           <label className="field">

@@ -14,7 +14,9 @@ import {
   importJournal,
   OfflineError,
   putDailyMetric,
+  putMealSlot,
   putSetting,
+  type SlotChange,
   setNote,
   upsertSymptom as saveSymptom,
   upsertGrowth as saveGrowth,
@@ -28,7 +30,9 @@ import { attachLegacyPhotos, clearLegacyPhotos } from './legacy'
 import { migrateMealType } from './meals'
 import { notifyPhotosChanged } from './photos'
 import type {
+  CalendarThresholds,
   ChildProfile,
+  SlotType,
   DailyMetricEntry,
   GrowthEntry,
   Settings,
@@ -205,7 +209,7 @@ export function useJournal() {
 
   const remember = useCallback((next: JournalData) => {
     notesRef.current = next.dayNotes
-    setData({ ...next, waters: next.waters ?? [], symptoms: next.symptoms ?? [], dailyMetrics: next.dailyMetrics ?? [], growth: next.growth ?? [], settings: next.settings ?? emptyJournal().settings })
+    setData({ ...next, waters: next.waters ?? [], symptoms: next.symptoms ?? [], dailyMetrics: next.dailyMetrics ?? [], growth: next.growth ?? [], mealSlots: next.mealSlots ?? [], settings: { ...emptyJournal().settings, ...next.settings } })
   }, [])
 
   useEffect(() => {
@@ -250,6 +254,8 @@ export function useJournal() {
     setData((prev) => ({
       ...prev,
       meals: [...prev.meals.filter((item) => item.id !== saved.id), saved],
+      // The server clears a "not eaten" mark when food is logged for that slot.
+      mealSlots: prev.mealSlots.filter((item) => !(item.date === saved.date && item.mealType === saved.type)),
     }))
   }, [])
 
@@ -315,6 +321,25 @@ export function useJournal() {
     remember(next)
     notifyPhotosChanged()
   }, [remember])
+
+  /** Mark a scheduled slot "not eaten" (optionally replacing logged food) or clear that mark. */
+  const setMealSlot = useCallback(async (date: string, mealType: SlotType, change: SlotChange) => {
+    const saved = await putMealSlot(date, mealType, change)
+    setData((prev) => {
+      const rest = prev.mealSlots.filter((item) => !(item.date === date && item.mealType === mealType))
+      return {
+        ...prev,
+        meals: saved.removedMeals.length ? prev.meals.filter((meal) => !saved.removedMeals.includes(meal.id)) : prev.meals,
+        mealSlots: saved.status === 'not-eaten' ? [...rest, { date, mealType, status: 'not-eaten', note: saved.note }] : rest,
+      }
+    })
+    if (saved.removedMeals.length) notifyPhotosChanged()
+  }, [])
+
+  const saveThresholds = useCallback(async (thresholds: CalendarThresholds) => {
+    const saved = await putSetting('calendar-thresholds', thresholds)
+    setData((prev) => ({ ...prev, settings: { ...prev.settings, calendarThresholds: saved } }))
+  }, [])
 
   const saveChildProfile = useCallback(async (profile: ChildProfile) => {
     const saved = await putSetting('child-profile', profile)
@@ -431,6 +456,8 @@ export function useJournal() {
     saveDailyMetric,
     upsertGrowth,
     removeGrowth,
+    setMealSlot,
+    saveThresholds,
     deleteEverything,
     saveChildProfile,
     saveReferences,

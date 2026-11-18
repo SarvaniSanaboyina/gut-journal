@@ -11,9 +11,11 @@ import {
   todayISO,
   weekdayLabels,
 } from '../dates'
+import { foodMap } from '../foods'
 import { formatCalories, hasCalories, totalCalories } from '../meals'
+import { buildDayIndex, CONSUMPTION_META, DEFAULT_THRESHOLDS, summariseDay, type ConsumptionState } from '../mealSlots'
 import { parseImportedJournal } from '../storage'
-import type { JournalData, MealEntry, MoodEntry, PoopEntry, WaterEntry } from '../types'
+import type { CalendarThresholds, JournalData, MealEntry, MoodEntry, PoopEntry, WaterEntry } from '../types'
 import { formatTotalMl, formatWater, totalWaterMl } from '../water'
 import { Chevron, MoodFace, StoolArt, WaterDrop } from './Icons'
 import { MealCard } from './MealCard'
@@ -31,16 +33,87 @@ function datesWithEntries(data: JournalData) {
   return set
 }
 
+const LEGEND_ORDER: ConsumptionState[] = ['less', 'enough', 'more', 'not-logged', 'all-skipped', 'unknown']
+
+function ThresholdForm({ value, onSave, onClose }: { value: CalendarThresholds; onSave: (value: CalendarThresholds) => Promise<void>; onClose: () => void }) {
+  const [less, setLess] = useState(String(value.lessBelow))
+  const [more, setMore] = useState(String(value.moreAbove))
+  const [error, setError] = useState<string | null>(null)
+  return (
+    <form
+      className="threshold-form"
+      onSubmit={async (event) => {
+        event.preventDefault()
+        const lessBelow = Number(less)
+        const moreAbove = Number(more)
+        if (!Number.isFinite(lessBelow) || !Number.isFinite(moreAbove) || lessBelow < 0 || moreAbove > 300 || lessBelow > moreAbove) {
+          setError('Use numbers from 0 to 300, with the first not above the second')
+          return
+        }
+        try {
+          await onSave({ lessBelow, moreAbove })
+          onClose()
+        } catch (saveError) {
+          setError(saveError instanceof Error ? saveError.message : 'Could not save')
+        }
+      }}
+    >
+      <label className="field"><span>“Less” below (%)</span><input type="number" min="0" max="300" value={less} onChange={(event) => setLess(event.target.value)} /></label>
+      <label className="field"><span>“More” above (%)</span><input type="number" min="0" max="300" value={more} onChange={(event) => setMore(event.target.value)} /></label>
+      {error && <div className="alert" role="alert">{error}</div>}
+      <div className="threshold-actions">
+        <button type="button" className="slot-btn" onClick={() => { setLess('50'); setMore('100') }}>Defaults</button>
+        <button type="button" className="slot-btn" onClick={onClose}>Cancel</button>
+        <button type="submit" className="slot-btn primary-soft">Save</button>
+      </div>
+    </form>
+  )
+}
+
+function CalendarLegend({ thresholds, onSaveThresholds }: { thresholds: CalendarThresholds; onSaveThresholds: (value: CalendarThresholds) => Promise<void> }) {
+  const [editing, setEditing] = useState(false)
+  const ranges: Partial<Record<ConsumptionState, string>> = {
+    less: `under ${thresholds.lessBelow}%`,
+    enough: `${thresholds.lessBelow}–${thresholds.moreAbove}%`,
+    more: `over ${thresholds.moreAbove}%`,
+  }
+  return (
+    <div className="cal-legend" aria-label="Calendar legend">
+      <ul>
+        {LEGEND_ORDER.map((state) => (
+          <li key={state}>
+            <i className={`cal-swatch ${state}`} style={{ background: CONSUMPTION_META[state].color }} aria-hidden="true" />
+            {CONSUMPTION_META[state].legend}
+            {ranges[state] && <small> ({ranges[state]})</small>}
+          </li>
+        ))}
+        <li><span className="cal-legend-ml">450 ml</span> Water that day (— = none recorded)</li>
+        <li><i className="cal-bm-dot" aria-hidden="true" /> Bowel movement recorded</li>
+      </ul>
+      <p>
+        Colour = share of served food eaten across the 5 scheduled meals (a skipped meal counts as 0%). Eating more is not automatically healthier.{' '}
+        <button type="button" className="link-btn" onClick={() => setEditing(!editing)}>{editing ? 'Close' : 'Adjust thresholds'}</button>
+      </p>
+      {editing && <ThresholdForm value={thresholds} onSave={onSaveThresholds} onClose={() => setEditing(false)} />}
+    </div>
+  )
+}
+
 export function HistoryView({
   data,
   onImport,
   onExport,
   onOpenDate,
+  onOpenDay,
+  onSaveThresholds,
 }: {
   data: JournalData
   onImport: (text: string) => Promise<void>
   onExport: () => Promise<void>
   onOpenDate: (iso: string) => void
+  /** Open the day-detail sheet for a date. */
+  onOpenDay: (iso: string) => void
+  onSaveThresholds: (value: CalendarThresholds) => Promise<void>
 }) {
   const today = todayISO()
   const [filter, setFilter] = useState<Filter>('all')
@@ -51,6 +124,12 @@ export function HistoryView({
   })
 
   const logged = useMemo(() => datesWithEntries(data), [data])
+  // One pass over the journal per data change; each cell then reads its own date from the index.
+  const dayIndex = useMemo(() => buildDayIndex(data), [data])
+  const foods = useMemo(() => foodMap(data.foods), [data.foods])
+  const thresholds = data.settings.calendarThresholds ?? DEFAULT_THRESHOLDS
+  // Days before the first record are "before tracking", not "not logged".
+  const firstLogged = useMemo(() => [...logged].sort()[0] ?? today, [logged, today])
   const cells = useMemo(() => monthCells(month.year, month.month), [month])
   const weekdays = useMemo(() => weekdayLabels(), [])
   const current = parseISODate(today)
@@ -113,7 +192,8 @@ export function HistoryView({
         </label>
       </div>
 
-      <section className="calendar">
+      <section className="calendar history-calendar">
+        <CalendarLegend thresholds={thresholds} onSaveThresholds={onSaveThresholds} />
         <div className="calendar-head">
           <button
             className="icon-btn"
@@ -141,23 +221,41 @@ export function HistoryView({
           {cells.map((iso, index) => {
             if (!iso) return <span className="calendar-blank" key={`blank-${index}`} />
             const future = iso > today
+            const tracked = !future && iso >= firstLogged
+            const day = summariseDay(dayIndex, iso, foods, thresholds)
+            const state = day.consumption.state
+            const meta = CONSUMPTION_META[state]
+            const water = day.waterMl == null ? null : formatTotalMl(day.waterMl).replace(' ', '\u00a0')
             const classes = [
-              'calendar-day',
+              'hist-cell',
+              tracked ? state : 'untracked',
               selected === iso ? 'selected' : '',
               isToday(iso) ? 'today' : '',
-              logged.has(iso) ? 'has-log' : '',
             ].filter(Boolean).join(' ')
+            const label = [
+              formatLongDate(iso),
+              tracked ? `${meta.legend}${day.consumption.percent != null && state !== 'all-skipped' ? ` (${Math.round(day.consumption.percent)}%)` : ''}` : future ? 'future' : 'before tracking started',
+              `meals ${day.completion.eaten} eaten, ${day.completion.skipped} skipped, ${day.completion.notLogged} not logged`,
+              day.waterMl == null ? 'no water recorded' : `water ${formatTotalMl(day.waterMl)}`,
+              day.bowelMovements ? `${day.bowelMovements} bowel movement${day.bowelMovements === 1 ? '' : 's'}` : 'no bowel movement recorded',
+            ].join(', ')
             return (
               <button
                 key={iso}
                 className={classes}
+                style={tracked ? { background: meta.color } : undefined}
                 disabled={future}
-                onClick={() => setSelected(iso)}
+                onClick={() => {
+                  setSelected(iso)
+                  onOpenDay(iso)
+                }}
                 aria-pressed={selected === iso}
-                aria-label={formatLongDate(iso)}
+                aria-label={label}
+                title={label}
               >
-                <span>{parseISODate(iso).getDate()}</span>
-                {logged.has(iso) && <i className="dot" />}
+                <span className="hist-num">{parseISODate(iso).getDate()}</span>
+                <span className="hist-ml">{future ? '' : water ?? '–'}</span>
+                <span className="hist-bm">{day.bowelMovements > 0 && <i className="cal-bm-dot" />}</span>
               </button>
             )
           })}

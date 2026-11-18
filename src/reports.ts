@@ -4,6 +4,8 @@ import { BRISTOL_GROUPS, findAssociations, gutStats, symptomLabel, type Associat
 import { averageTotals, NUTRIENTS, type NutrientTotals } from './nutrition'
 import type { FoodGroup, JournalData, NutrientKey } from './types'
 import { totalWaterMl } from './water'
+import { buildDayIndex, DEFAULT_THRESHOLDS, SLOTS, summariseDay, type ConsumptionState } from './mealSlots'
+import type { SlotType } from './types'
 
 /**
  * Period summaries for reports: one pass over a set of days, plus a comparison with the
@@ -50,6 +52,7 @@ export type PeriodSummary = {
   }
   gut: {
     bowelMovements: number
+    daysWithBowel: number
     perTrackedDay: number | null
     daysWithout: number
     longestGap: number
@@ -60,6 +63,26 @@ export type PeriodSummary = {
     symptoms: number
     symptomDays: number
     symptomTypes: { name: string; count: number; severe: number }[]
+  }
+  schedule: {
+    completeDays: number
+    incompleteDays: number
+    noLogDays: number
+    /** Averages over days with at least one slot recorded, so unrecorded days are not counted as zero. */
+    avgEaten: number | null
+    avgSkipped: number | null
+    skippedBySlot: Record<SlotType, number>
+    notLoggedBySlot: Record<SlotType, number>
+    /** Per-day consumption; null percent when not every slot was recorded or amounts were missing. */
+    byDay: { date: string; eaten: number; skipped: number; notLogged: number; percent: number | null; state: ConsumptionState }[]
+    averagePercent: number | null
+  }
+  hydration: {
+    daysRecorded: number
+    daysMissing: number
+    /** Average over days with at least one water record. */
+    averageMl: number | null
+    byDay: { date: string; ml: number | null }[]
   }
   checkIns: {
     days: number
@@ -165,10 +188,51 @@ export function summarisePeriod(data: JournalData, range: ReportRange): PeriodSu
     }
   }
 
+  // Meal schedule and hydration, from the same per-day summaries the calendar uses
+  const index = buildDayIndex(data)
+  const foodsMap = new Map(data.foods.map((food) => [food.id, food]))
+  const thresholds = data.settings.calendarThresholds ?? DEFAULT_THRESHOLDS
+  const daySummaries = days.map((day) => summariseDay(index, day, foodsMap, thresholds))
+  const recordedDays = daySummaries.filter((day) => day.completion.status !== 'not-logged')
+  const skippedBySlot = Object.fromEntries(SLOTS.map((slot) => [slot.id, 0])) as Record<SlotType, number>
+  const notLoggedBySlot = Object.fromEntries(SLOTS.map((slot) => [slot.id, 0])) as Record<SlotType, number>
+  for (const day of recordedDays) {
+    for (const slot of day.slots) {
+      if (slot.status === 'not-eaten') skippedBySlot[slot.slot.id] += 1
+      if (slot.status === 'not-logged') notLoggedBySlot[slot.slot.id] += 1
+    }
+  }
+  const percents = daySummaries.map((day) => day.consumption.percent).filter((value): value is number => value != null)
+  const waterDays = daySummaries.filter((day) => day.waterMl != null)
+
   return {
     range,
     days,
     trackedDays: gut.trackedDays.length,
+    schedule: {
+      completeDays: daySummaries.filter((day) => day.completion.status === 'complete').length,
+      incompleteDays: daySummaries.filter((day) => day.completion.status === 'incomplete').length,
+      noLogDays: daySummaries.filter((day) => day.completion.status === 'not-logged').length,
+      avgEaten: recordedDays.length ? recordedDays.reduce((sum, day) => sum + day.completion.eaten, 0) / recordedDays.length : null,
+      avgSkipped: recordedDays.length ? recordedDays.reduce((sum, day) => sum + day.completion.skipped, 0) / recordedDays.length : null,
+      skippedBySlot,
+      notLoggedBySlot,
+      byDay: daySummaries.map((day) => ({
+        date: day.date,
+        eaten: day.completion.eaten,
+        skipped: day.completion.skipped,
+        notLogged: day.completion.notLogged,
+        percent: day.consumption.state === 'all-skipped' ? 0 : day.consumption.percent,
+        state: day.consumption.state,
+      })),
+      averagePercent: percents.length ? percents.reduce((sum, value) => sum + value, 0) / percents.length : null,
+    },
+    hydration: {
+      daysRecorded: waterDays.length,
+      daysMissing: days.length - waterDays.length,
+      averageMl: waterDays.length ? waterDays.reduce((sum, day) => sum + day.waterMl!, 0) / waterDays.length : null,
+      byDay: daySummaries.map((day) => ({ date: day.date, ml: day.waterMl })),
+    },
     eating: {
       meals: meals.length,
       mealDays,
@@ -187,6 +251,7 @@ export function summarisePeriod(data: JournalData, range: ReportRange): PeriodSu
     nutrition: { loggedDays: nutrition.loggedDays, groupDays, average: nutrition.average },
     gut: {
       bowelMovements: gut.poops.length,
+      daysWithBowel: new Set(gut.poops.map((poop) => poop.date)).size,
       perTrackedDay: gut.trackedDays.length ? gut.perDay : null,
       daysWithout: gut.daysWithout,
       longestGap: gut.longestGap,
@@ -297,6 +362,7 @@ export function comparisonSections(current: PeriodSummary, previous: PeriodSumma
 
   const gut: CompareRow[] = [
     row('bm', 'Bowel movements', pick(curHas.tracked, current.gut.bowelMovements), pick(prevHas.tracked, previous.gut.bowelMovements), { digits: 0 }),
+    row('bmdays', 'Days with a bowel movement', pick(curHas.tracked, current.gut.daysWithBowel), pick(prevHas.tracked, previous.gut.daysWithBowel), { digits: 0 }),
     row('bmpd', 'Per tracked day', current.gut.perTrackedDay, previous.gut.perTrackedDay),
     row('gap', 'Longest run without one (days)', pick(curHas.tracked, current.gut.longestGap), pick(prevHas.tracked, previous.gut.longestGap), { digits: 0 }),
     ...BRISTOL_GROUPS.map((group) =>
@@ -307,13 +373,30 @@ export function comparisonSections(current: PeriodSummary, previous: PeriodSumma
     row('symdays', 'Days with symptoms', pick(curHas.tracked, current.gut.symptomDays), pick(prevHas.tracked, previous.gut.symptomDays), { digits: 0 }),
   ]
 
+  const curRecorded = current.days.length - current.schedule.noLogDays > 0
+  const prevRecorded = previous.days.length - previous.schedule.noLogDays > 0
+  const schedule: CompareRow[] = [
+    row('complete', 'Complete days (all 5 recorded)', current.schedule.completeDays, previous.schedule.completeDays, { digits: 0 }),
+    row('incomplete', 'Incomplete days', current.schedule.incompleteDays, previous.schedule.incompleteDays, { digits: 0 }),
+    row('nolog', 'Days with no meal logs', current.schedule.noLogDays, previous.schedule.noLogDays, { digits: 0 }),
+    row('avgEaten', 'Meals eaten per recorded day', pick(curRecorded, current.schedule.avgEaten), pick(prevRecorded, previous.schedule.avgEaten)),
+    row('avgSkipped', 'Meals skipped per recorded day', pick(curRecorded, current.schedule.avgSkipped), pick(prevRecorded, previous.schedule.avgSkipped)),
+    row('consumption', 'Share eaten (complete days)', current.schedule.averagePercent, previous.schedule.averagePercent, { digits: 0, suffix: '%' }),
+  ]
+
+  const hydration: CompareRow[] = [
+    row('waterAvg', 'Water per recorded day', current.hydration.averageMl, previous.hydration.averageMl, { digits: 0, suffix: ' ml' }),
+    row('waterDays', 'Days with water recorded', current.hydration.daysRecorded, previous.hydration.daysRecorded, { digits: 0 }),
+    row('waterMissing', 'Days without a water record', current.hydration.daysMissing, previous.hydration.daysMissing, { digits: 0 }),
+  ]
+
   const wellbeing: CompareRow[] = [
     row('sleep', 'Average sleep', current.checkIns.averageSleep, previous.checkIns.averageSleep, { suffix: ' h' }),
     row('appetite', 'Low-appetite days', pick(curHas.checkIns, current.checkIns.lowAppetiteDays), pick(prevHas.checkIns, previous.checkIns.lowAppetiteDays), { digits: 0 }),
     row('energy', 'Low-energy days', pick(curHas.checkIns, current.checkIns.lowEnergyDays), pick(prevHas.checkIns, previous.checkIns.lowEnergyDays), { digits: 0 }),
   ]
 
-  return { eating, nutrition, gut, wellbeing }
+  return { eating, nutrition, gut, wellbeing, schedule, hydration }
 }
 
 /** Short plain-language highlights; descriptive only. */
@@ -321,6 +404,17 @@ export function reportHighlights(current: PeriodSummary, previous: PeriodSummary
   const out: string[] = []
   if (current.trackedDays === 0) return ['Nothing was logged in this period.']
   const { eating, gut } = current
+  const { schedule } = current
+  if (schedule.completeDays + schedule.incompleteDays > 0) {
+    const mostSkipped = SLOTS.map((slot) => ({ slot, count: schedule.skippedBySlot[slot.id] })).sort((x, y) => y.count - x.count)[0]
+    out.push(
+      `${schedule.completeDays} of ${current.days.length} days had all 5 meals recorded${schedule.incompleteDays ? `, ${schedule.incompleteDays} partly` : ''}.` +
+        (mostSkipped && mostSkipped.count ? ` ${mostSkipped.slot.label} was skipped most often (${mostSkipped.count}×).` : ''),
+    )
+  }
+  if (current.hydration.daysRecorded) {
+    out.push(`Water: about ${Math.round(current.hydration.averageMl!)} ml per recorded day, on ${current.hydration.daysRecorded} of ${current.days.length} days.`)
+  }
   if (eating.mealDays) {
     out.push(`Meals were logged on ${eating.mealDays} of ${current.days.length} days, ${eating.distinctFoods} different food${eating.distinctFoods === 1 ? '' : 's'}.`)
   }

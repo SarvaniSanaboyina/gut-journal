@@ -253,3 +253,17 @@ model GrowthRecord {
   @@index([date])
   @@map("growth_records")
 }
+
+/// Explicit status for one of the five scheduled meal slots on a date. Only "not eaten" is stored;
+/// "eaten" comes from meal entries and "not logged" is the absence of both.
+model MealSlot {
+  date      String
+  mealType  String   @map("meal_type")
+  status    String
+  note      String   @default("")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@id([date, mealType])
+  @@map("meal_slots")
+}

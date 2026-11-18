@@ -1,4 +1,4 @@
-import type { DailyMetricEntry, FoodEntry, GrowthEntry, JournalData, MealEntry, MoodEntry, PoopEntry, SymptomEntry, WaterEntry } from './types'
+import type { DailyMetricEntry, FoodEntry, GrowthEntry, JournalData, MealSlotEntry, SlotType, MealEntry, MoodEntry, PoopEntry, SymptomEntry, WaterEntry } from './types'
 
 type PhotoSlot = 'before' | 'after' | 'stool'
 
@@ -150,7 +150,16 @@ export function deleteAllData() {
   })
 }
 
-export function putSetting<T>(key: 'child-profile' | 'nutrient-references', value: T) {
+export type SlotChange = { status: 'not-eaten'; note?: string; replaceMeals?: boolean } | { status: 'not-logged' }
+
+export function putMealSlot(date: string, mealType: SlotType, change: SlotChange) {
+  return sendJson<(MealSlotEntry | { date: string; mealType: SlotType; status: 'not-logged' }) & { removedMeals: string[] }>(
+    `/api/meal-slots/${encodeURIComponent(date)}/${mealType}`,
+    putJson(change),
+  )
+}
+
+export function putSetting<T>(key: 'child-profile' | 'nutrient-references' | 'calendar-thresholds', value: T) {
   return sendJson<T>(`/api/settings/${key}`, putJson(value))
 }
 
