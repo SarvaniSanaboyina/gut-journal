@@ -25,6 +25,75 @@ export interface MealEntry {
   notes: string
   hasBeforePhoto: boolean
   hasAfterPhoto: boolean
+  source: MealSource
+  items: MealItem[]
+}
+
+export type MealSource = '' | 'homemade' | 'packaged' | 'restaurant'
+
+export type FoodCategory =
+  | 'cereals'
+  | 'fruits'
+  | 'vegetables'
+  | 'dairy'
+  | 'protein'
+  | 'legumes'
+  | 'fats'
+  | 'snacks'
+  | 'beverages'
+
+export type FoodGroup = 'carbohydrate' | 'protein' | 'vegetable' | 'fruit' | 'fat'
+
+export type FoodUnit = 'g' | 'ml' | 'pieces' | 'cups' | 'bowls' | 'spoons'
+
+export type NutrientKey =
+  | 'energyKcal'
+  | 'proteinG'
+  | 'carbsG'
+  | 'fatG'
+  | 'fibreG'
+  | 'ironMg'
+  | 'calciumMg'
+  | 'vitaminDUg'
+  | 'zincMg'
+  | 'vitaminCMg'
+  | 'omega3G'
+
+/** Per 100 g. `null` = unknown, never zero. */
+export type Nutrients = Record<NutrientKey, number | null>
+
+/** `catalogue` = estimated from food composition tables, `label` = copied from a pack label by a parent. */
+export type NutrientSource = 'catalogue' | 'label' | 'none'
+
+export interface FoodEntry {
+  id: string
+  name: string
+  aliases: string[]
+  category: FoodCategory
+  groups: FoodGroup[]
+  defaultUnit: FoodUnit
+  defaultQty: number | null
+  unitGrams: Partial<Record<Exclude<FoodUnit, 'g'>, number>>
+  nutrients: Nutrients
+  nutrientSource: NutrientSource
+  ingredients: string[]
+  isCustom: boolean
+}
+
+export interface MealIngredient {
+  id: string
+  foodId: string | null
+  name: string
+  quantityServed: number | null
+  quantityConsumed: number | null
+  unit: FoodUnit
+  consumedPercent: number | null
+  preparation: string
+  notes: string
+}
+
+export interface MealItem extends MealIngredient {
+  ingredients: MealIngredient[]
 }
 
 export type BristolType = 1 | 2 | 3 | 4 | 5 | 6 | 7
@@ -89,6 +158,7 @@ export interface JournalData {
   moods: MoodEntry[]
   waters: WaterEntry[]
   dayNotes: Record<string, string>
+  foods: FoodEntry[]
 }
 
 export const emptyJournal = (): JournalData => ({
@@ -97,4 +167,5 @@ export const emptyJournal = (): JournalData => ({
   moods: [],
   waters: [],
   dayNotes: {},
+  foods: [],
 })

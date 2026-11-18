@@ -55,6 +55,21 @@ export function TodayView({
 
   return (
     <>
+      <div className="quick-log" role="group" aria-label="Quick log">
+        <button type="button" className="primary-log" onClick={onAddMeal}>
+          <span className="qi" aria-hidden="true">🍽️</span>Meal
+        </button>
+        <button type="button" onClick={onAddWater}>
+          <span className="qi" aria-hidden="true">💧</span>Water
+        </button>
+        <button type="button" onClick={onAddPoop}>
+          <span className="qi" aria-hidden="true">🚽</span>Poop
+        </button>
+        <button type="button" onClick={onAddMood}>
+          <span className="qi" aria-hidden="true">🙂</span>Mood
+        </button>
+      </div>
+
       <div className="summary">
         <div className="summary-card">
           <span>Meals</span>

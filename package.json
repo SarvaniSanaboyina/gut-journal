@@ -16,6 +16,7 @@
     "start": "tsx server/index.ts",
     "prisma:generate": "prisma generate",
     "lint": "oxlint",
+    "test:api": "tsx scripts/smoke.ts",
     "preview": "vite preview"
   },
   "dependencies": {

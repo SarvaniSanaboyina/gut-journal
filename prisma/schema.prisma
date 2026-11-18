@@ -44,7 +44,10 @@ model Meal {
   notes              String    @default("")
   hasBeforePhoto     Boolean   @default(false) @map("has_before_photo")
   hasAfterPhoto      Boolean   @default(false) @map("has_after_photo")
+  source             String    @default("")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  items              MealItem[]
 
   @@index([date, time], map: "meals_date_idx")
   @@map("meals")
@@ -110,4 +113,72 @@ model MealPhoto {
 
   @@id([mealId, slot])
   @@map("meal_photos")
+}
+
+/// Built-in catalogue foods (is_custom = false, seeded on boot) and parents' custom foods.
+/// Nutrients are per 100 g; a null nutrient means "unknown", never zero.
+model FoodItem {
+  id             String     @id
+  name           String
+  aliases        Json       @default("[]")
+  category       String
+  foodGroups     Json       @default("[]") @map("food_groups")
+  defaultUnit    String     @map("default_unit")
+  defaultQty     Float?     @map("default_qty")
+  unitGrams      Json       @default("{}") @map("unit_grams")
+  nutrients      Json       @default("{}")
+  nutrientSource String     @default("none") @map("nutrient_source")
+  ingredients    Json       @default("[]")
+  isCustom       Boolean    @default(false) @map("is_custom")
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  mealItems      MealItem[]
+
+  @@index([isCustom], map: "food_items_custom_idx")
+  @@map("food_items")
+}
+
+/// One food in a meal. Ingredients of a composite dish point at their dish via parentItemId.
+model MealItem {
+  id               String     @id
+  mealId           String     @map("meal_id")
+  parentItemId     String?    @map("parent_item_id")
+  foodItemId       String?    @map("food_item_id")
+  foodName         String     @map("food_name")
+  quantityServed   Float?     @map("quantity_served")
+  quantityConsumed Float?     @map("quantity_consumed")
+  unit             String
+  consumedPercent  Int?       @map("consumed_percent") @db.SmallInt
+  preparation      String     @default("")
+  notes            String     @default("")
+  position         Int        @default(0)
+  meal             Meal       @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  parent           MealItem?  @relation("Ingredients", fields: [parentItemId], references: [id], onDelete: Cascade)
+  ingredients      MealItem[] @relation("Ingredients")
+  food             FoodItem?  @relation(fields: [foodItemId], references: [id], onDelete: SetNull)
+
+  @@index([mealId], map: "meal_items_meal_idx")
+  @@index([foodItemId], map: "meal_items_food_idx")
+  @@map("meal_items")
+}
+
+/// Previous versions of edited or deleted records, so history edits never silently lose data.
+model RecordRevision {
+  id        String   @id
+  entity    String
+  entityId  String   @map("entity_id")
+  action    String
+  data      Json
+  changedAt DateTime @default(now()) @map("changed_at") @db.Timestamptz()
+
+  @@index([entity, entityId], map: "record_revisions_entity_idx")
+  @@map("record_revisions")
+}
+
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@map("settings")
 }

@@ -1,14 +1,24 @@
-import type { Meal, Mood, Poop, Prisma, PrismaClient, Water } from '@prisma/client'
+import type { Meal, MealItem, Mood, Poop, PrismaClient, Water } from '@prisma/client'
+import { FOOD_UNITS, type FoodUnit } from './foodCatalog.ts'
+import { type FoodEntry, listFoods, parseCustomFood, upsertCustomFood } from './foods.ts'
+import {
+  bad,
+  type Db,
+  isRecord,
+  MAX_NOTE,
+  MAX_TEXT,
+  oneOf,
+  parseDate,
+  parseFlag,
+  parseId,
+  parseOptionalNumber,
+  parseQuantity,
+  parseText,
+  parseTime,
+  recordRevision,
+} from './validate.ts'
 
-export class HttpError extends Error {
-  status: number
-
-  constructor(status: number, message: string) {
-    super(message)
-    this.status = status
-    this.name = 'HttpError'
-  }
-}
+export { HttpError } from './validate.ts'
 
 const MEAL_TYPES = [
   'breakfast',
@@ -26,6 +36,9 @@ const AMOUNTS = ['small', 'medium', 'large'] as const
 const MOODS = ['happy', 'calm', 'fussy', 'tired', 'irritable', 'energetic', 'tummy'] as const
 const WATER_UNITS = ['ml', 'sips', 'cups'] as const
 const PHOTO_SLOTS = ['before', 'after'] as const
+const MEAL_SOURCES = ['', 'homemade', 'packaged', 'restaurant'] as const
+const MAX_ITEMS = 40
+const MAX_INGREDIENTS = 20
 
 export type PhotoSlot = (typeof PHOTO_SLOTS)[number]
 
@@ -44,7 +57,23 @@ export type MealEntry = {
   notes: string
   hasBeforePhoto: boolean
   hasAfterPhoto: boolean
+  source: (typeof MEAL_SOURCES)[number]
+  items: MealItemEntry[]
 }
+
+export type MealIngredientEntry = {
+  id: string
+  foodId: string | null
+  name: string
+  quantityServed: number | null
+  quantityConsumed: number | null
+  unit: FoodUnit
+  consumedPercent: number | null
+  preparation: string
+  notes: string
+}
+
+export type MealItemEntry = MealIngredientEntry & { ingredients: MealIngredientEntry[] }
 
 export type PoopEntry = {
   id: string
@@ -82,81 +111,10 @@ export type JournalData = {
   moods: MoodEntry[]
   waters: WaterEntry[]
   dayNotes: Record<string, string>
+  foods: FoodEntry[]
 }
-
-type Db = PrismaClient | Prisma.TransactionClient
 
 const MAX_ENTRIES = 10000
-const MAX_TEXT = 4000
-const MAX_NOTE = 8000
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
-}
-
-function bad(message: string): never {
-  throw new HttpError(400, message)
-}
-
-function oneOf<T extends string>(value: string, allowed: readonly T[], label: string): T {
-  if ((allowed as readonly string[]).includes(value)) return value as T
-  return bad(`Invalid ${label}`)
-}
-
-function parseId(value: unknown, fallbackNew = false): string {
-  if (typeof value !== 'string' || value.trim() === '') {
-    if (fallbackNew) return crypto.randomUUID()
-    return bad('Invalid id')
-  }
-  if (!/^[0-9a-zA-Z-]{1,80}$/.test(value)) return bad('Invalid id')
-  return value
-}
-
-function parseDate(value: unknown): string {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return bad('Invalid date')
-  const [year, month, day] = value.split('-').map(Number)
-  const date = new Date(Date.UTC(year, month - 1, day))
-  if (
-    date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month - 1 ||
-    date.getUTCDate() !== day
-  ) {
-    return bad('Invalid date')
-  }
-  return value
-}
-
-function parseTime(value: unknown, optional = false): string {
-  if (optional && (value === '' || value == null)) return ''
-  if (typeof value !== 'string') return bad('Invalid time')
-  const match = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(value)
-  if (!match) return bad('Invalid time')
-  const hour = Number(match[1])
-  const minute = Number(match[2])
-  const second = match[3] == null ? null : Number(match[3])
-  if (hour > 23 || minute > 59 || (second != null && second > 59)) return bad('Invalid time')
-  const clock = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
-  return second == null ? clock : `${clock}:${String(second).padStart(2, '0')}`
-}
-
-function parseText(value: unknown, max: number): string {
-  if (value == null) return ''
-  if (typeof value !== 'string') return bad('Invalid text')
-  const text = value.trim()
-  if (text.length > max) return bad('Text is too long')
-  return text
-}
-
-function parseFlag(value: unknown): boolean {
-  return value === true
-}
-
-function parseQuantity(value: unknown): number | null {
-  if (value == null || value === '') return null
-  const number = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN
-  if (!Number.isFinite(number) || number < 0 || number > 100000) return bad('Invalid quantity')
-  return number
-}
 
 function migrateMealType(type: string): MealEntry['type'] {
   if (type === 'snack') return 'morning-snack'
@@ -165,7 +123,33 @@ function migrateMealType(type: string): MealEntry['type'] {
   return 'mini-snack'
 }
 
-function mealFromRow(row: Meal): MealEntry {
+type MealRow = Meal & { items?: MealItem[] }
+
+function ingredientFromRow(row: MealItem): MealIngredientEntry {
+  return {
+    id: row.id,
+    foodId: row.foodItemId,
+    name: row.foodName,
+    quantityServed: row.quantityServed == null ? null : Number(row.quantityServed),
+    quantityConsumed: row.quantityConsumed == null ? null : Number(row.quantityConsumed),
+    unit: row.unit as FoodUnit,
+    consumedPercent: row.consumedPercent == null ? null : Number(row.consumedPercent),
+    preparation: row.preparation,
+    notes: row.notes,
+  }
+}
+
+function itemsFromRows(rows: MealItem[]): MealItemEntry[] {
+  const sorted = [...rows].sort((a, b) => a.position - b.position)
+  return sorted
+    .filter((row) => !row.parentItemId)
+    .map((row) => ({
+      ...ingredientFromRow(row),
+      ingredients: sorted.filter((child) => child.parentItemId === row.id).map(ingredientFromRow),
+    }))
+}
+
+function mealFromRow(row: MealRow): MealEntry {
   return {
     id: row.id,
     date: row.date,
@@ -181,6 +165,8 @@ function mealFromRow(row: Meal): MealEntry {
     notes: row.notes,
     hasBeforePhoto: row.hasBeforePhoto === true,
     hasAfterPhoto: row.hasAfterPhoto === true,
+    source: (MEAL_SOURCES as readonly string[]).includes(row.source) ? (row.source as MealEntry['source']) : '',
+    items: itemsFromRows(row.items ?? []),
   }
 }
 
@@ -220,6 +206,50 @@ function waterFromRow(row: Water): WaterEntry {
   }
 }
 
+function parseIngredient(value: unknown, loose: boolean): MealIngredientEntry {
+  if (!isRecord(value)) return bad('Invalid food in meal')
+  const name = parseText(value.name, 120)
+  if (!name) return bad('Each food needs a name')
+  const quantityServed = parseOptionalNumber(value.quantityServed, 'quantity served', 5000)
+  const quantityConsumed = parseOptionalNumber(value.quantityConsumed, 'quantity eaten', 5000)
+  let consumedPercent = parseOptionalNumber(value.consumedPercent, 'amount eaten', 100)
+  if (quantityServed != null && quantityConsumed != null) {
+    if (quantityConsumed > quantityServed + 1e-9) {
+      return bad(`${name}: eaten cannot be more than served. Add second helpings to the amount served.`)
+    }
+    // Keep a tapped quick-choice (e.g. 75%) unless the typed amounts clearly disagree with it.
+    const derived = quantityServed > 0 ? (quantityConsumed / quantityServed) * 100 : consumedPercent
+    if (derived != null && (consumedPercent == null || Math.abs(derived - consumedPercent) > 2)) consumedPercent = derived
+  }
+  const foodId = value.foodId == null || value.foodId === '' ? null : parseId(value.foodId)
+  return {
+    id: parseId(value.id, loose),
+    foodId,
+    name,
+    quantityServed,
+    quantityConsumed,
+    unit: oneOf(typeof value.unit === 'string' ? value.unit : 'pieces', FOOD_UNITS, 'unit'),
+    consumedPercent: consumedPercent == null ? null : Math.round(consumedPercent),
+    preparation: parseText(value.preparation, 120),
+    notes: parseText(value.notes, MAX_TEXT),
+  }
+}
+
+function parseItems(value: unknown, loose: boolean): MealItemEntry[] {
+  if (value == null) return []
+  if (!Array.isArray(value)) return bad('Invalid meal foods')
+  if (value.length > MAX_ITEMS) return bad('Too many foods in one meal')
+  const items = value.map((raw) => {
+    const item = parseIngredient(raw, loose)
+    const rawIngredients = isRecord(raw) && Array.isArray(raw.ingredients) ? raw.ingredients : []
+    if (rawIngredients.length > MAX_INGREDIENTS) return bad('Too many ingredients for one food')
+    return { ...item, ingredients: rawIngredients.map((child) => parseIngredient(child, loose)) }
+  })
+  const ids = items.flatMap((item) => [item.id, ...item.ingredients.map((child) => child.id)])
+  if (new Set(ids).size !== ids.length) return bad('Duplicate food in meal')
+  return items
+}
+
 function parseMeal(value: unknown, looseType = false): MealEntry {
   if (!isRecord(value)) return bad('Invalid meal')
   const consistency = oneOf(
@@ -230,8 +260,9 @@ function parseMeal(value: unknown, looseType = false): MealEntry {
   const percent = parseQuantity(value.consistencyPercent)
   const typeSource = typeof value.type === 'string' ? value.type : 'mini-snack'
   const type = looseType ? migrateMealType(typeSource) : oneOf(typeSource, MEAL_TYPES, 'meal type')
-  const foods = parseText(value.foods, MAX_TEXT)
-  if (!foods) return bad('A meal needs a description of what he ate')
+  const items = parseItems(value.items, looseType)
+  const foods = parseText(value.foods, MAX_TEXT) || items.map((item) => item.name).join(', ')
+  if (!foods) return bad('Add at least one food to the meal')
   return {
     id: parseId(value.id, looseType),
     date: parseDate(value.date),
@@ -254,6 +285,8 @@ function parseMeal(value: unknown, looseType = false): MealEntry {
     notes: parseText(value.notes, MAX_TEXT),
     hasBeforePhoto: parseFlag(value.hasBeforePhoto),
     hasAfterPhoto: parseFlag(value.hasAfterPhoto),
+    source: oneOf(typeof value.source === 'string' ? value.source : '', MEAL_SOURCES, 'meal source'),
+    items,
   }
 }
 
@@ -336,8 +369,9 @@ async function insertMeal(db: Db, meal: MealEntry) {
     notes: meal.notes,
     hasBeforePhoto: meal.hasBeforePhoto,
     hasAfterPhoto: meal.hasAfterPhoto,
+    source: meal.source,
   }
-  return db.meal.upsert({
+  await db.meal.upsert({
     where: { id: meal.id },
     create: data,
     update: {
@@ -354,8 +388,37 @@ async function insertMeal(db: Db, meal: MealEntry) {
       notes: data.notes,
       hasBeforePhoto: data.hasBeforePhoto,
       hasAfterPhoto: data.hasAfterPhoto,
+      source: data.source,
     },
   })
+  await db.mealItem.deleteMany({ where: { mealId: meal.id } })
+  const knownFoods = new Set(
+    (await db.foodItem.findMany({
+      where: { id: { in: meal.items.flatMap((item) => [item.foodId, ...item.ingredients.map((child) => child.foodId)]).filter((id): id is string => id != null) } },
+      select: { id: true },
+    })).map((row) => row.id),
+  )
+  const row = (item: MealIngredientEntry, position: number, parentItemId: string | null) => ({
+    id: item.id,
+    mealId: meal.id,
+    parentItemId,
+    // A food deleted from the catalogue keeps its name snapshot on the meal.
+    foodItemId: item.foodId && knownFoods.has(item.foodId) ? item.foodId : null,
+    foodName: item.name,
+    quantityServed: item.quantityServed,
+    quantityConsumed: item.quantityConsumed,
+    unit: item.unit,
+    consumedPercent: item.consumedPercent,
+    preparation: item.preparation,
+    notes: item.notes,
+    position,
+  })
+  const parents = meal.items.map((item, index) => row(item, index, null))
+  const children = meal.items.flatMap((item) => item.ingredients.map((child, index) => row(child, index, item.id)))
+  if (parents.length) await db.mealItem.createMany({ data: parents })
+  if (children.length) await db.mealItem.createMany({ data: children })
+  const saved = await db.meal.findUniqueOrThrow({ where: { id: meal.id }, include: { items: true } })
+  return mealFromRow(saved)
 }
 
 async function insertPoop(db: Db, entry: PoopEntry) {
@@ -446,12 +509,13 @@ async function insertPhoto(db: Db, mealId: string, slot: PhotoSlot, mime: string
 
 export async function readJournal(db: PrismaClient): Promise<JournalData> {
   const [meals, poops, moods, waters, notes] = await Promise.all([
-    db.meal.findMany({ orderBy: [{ date: 'asc' }, { time: 'asc' }, { id: 'asc' }] }),
+    db.meal.findMany({ orderBy: [{ date: 'asc' }, { time: 'asc' }, { id: 'asc' }], include: { items: true } }),
     db.poop.findMany({ orderBy: [{ date: 'asc' }, { time: 'asc' }, { id: 'asc' }] }),
     db.mood.findMany({ orderBy: [{ date: 'asc' }, { time: 'asc' }, { id: 'asc' }] }),
     db.water.findMany({ orderBy: [{ date: 'asc' }, { time: 'asc' }, { id: 'asc' }] }),
     db.dayNote.findMany({ orderBy: { date: 'asc' } }),
   ])
+  const foods = await listFoods(db)
   const dayNotes: Record<string, string> = {}
   for (const row of notes) dayNotes[row.date] = row.note
   return {
@@ -460,51 +524,84 @@ export async function readJournal(db: PrismaClient): Promise<JournalData> {
     moods: moods.map(moodFromRow),
     waters: waters.map(waterFromRow),
     dayNotes,
+    foods,
   }
 }
 
 export async function saveMeal(db: PrismaClient, body: unknown) {
   const meal = parseMeal(body)
-  const saved = await insertMeal(db, meal)
-  return mealFromRow(saved)
+  return db.$transaction(async (tx) => {
+    const existing = await tx.meal.findUnique({ where: { id: meal.id }, include: { items: true } })
+    if (existing) await recordRevision(tx, 'meal', meal.id, 'update', mealFromRow(existing))
+    return insertMeal(tx, meal)
+  })
 }
 
 export async function removeMeal(db: PrismaClient, id: string) {
   const mealId = parseId(id)
-  await db.$transaction([
-    db.mealPhoto.deleteMany({ where: { mealId } }),
-    db.meal.deleteMany({ where: { id: mealId } }),
-  ])
+  await db.$transaction(async (tx) => {
+    const existing = await tx.meal.findUnique({ where: { id: mealId }, include: { items: true } })
+    if (existing) await recordRevision(tx, 'meal', mealId, 'delete', mealFromRow(existing))
+    await tx.mealPhoto.deleteMany({ where: { mealId } })
+    await tx.meal.deleteMany({ where: { id: mealId } })
+  })
 }
 
 export async function savePoop(db: PrismaClient, body: unknown) {
   const entry = parsePoop(body)
-  await insertPoop(db, entry)
+  await db.$transaction(async (tx) => {
+    const existing = await tx.poop.findUnique({ where: { id: entry.id } })
+    if (existing) await recordRevision(tx, 'poop', entry.id, 'update', poopFromRow(existing))
+    await insertPoop(tx, entry)
+  })
   return entry
 }
 
 export async function removePoop(db: PrismaClient, id: string) {
-  await db.poop.deleteMany({ where: { id: parseId(id) } })
+  const poopId = parseId(id)
+  await db.$transaction(async (tx) => {
+    const existing = await tx.poop.findUnique({ where: { id: poopId } })
+    if (existing) await recordRevision(tx, 'poop', poopId, 'delete', poopFromRow(existing))
+    await tx.poop.deleteMany({ where: { id: poopId } })
+  })
 }
 
 export async function saveMood(db: PrismaClient, body: unknown) {
   const entry = parseMood(body)
-  await insertMood(db, entry)
+  await db.$transaction(async (tx) => {
+    const existing = await tx.mood.findUnique({ where: { id: entry.id } })
+    if (existing) await recordRevision(tx, 'mood', entry.id, 'update', moodFromRow(existing))
+    await insertMood(tx, entry)
+  })
   return entry
 }
 
 export async function removeMood(db: PrismaClient, id: string) {
-  await db.mood.deleteMany({ where: { id: parseId(id) } })
+  const moodId = parseId(id)
+  await db.$transaction(async (tx) => {
+    const existing = await tx.mood.findUnique({ where: { id: moodId } })
+    if (existing) await recordRevision(tx, 'mood', moodId, 'delete', moodFromRow(existing))
+    await tx.mood.deleteMany({ where: { id: moodId } })
+  })
 }
 
 export async function saveWater(db: PrismaClient, body: unknown) {
   const entry = parseWater(body)
-  await insertWater(db, entry)
+  await db.$transaction(async (tx) => {
+    const existing = await tx.water.findUnique({ where: { id: entry.id } })
+    if (existing) await recordRevision(tx, 'water', entry.id, 'update', waterFromRow(existing))
+    await insertWater(tx, entry)
+  })
   return entry
 }
 
 export async function removeWater(db: PrismaClient, id: string) {
-  await db.water.deleteMany({ where: { id: parseId(id) } })
+  const waterId = parseId(id)
+  await db.$transaction(async (tx) => {
+    const existing = await tx.water.findUnique({ where: { id: waterId } })
+    if (existing) await recordRevision(tx, 'water', waterId, 'delete', waterFromRow(existing))
+    await tx.water.deleteMany({ where: { id: waterId } })
+  })
 }
 
 export async function saveDayNote(db: PrismaClient, dateValue: string, body: unknown) {
@@ -597,6 +694,11 @@ export async function importJournal(db: PrismaClient, body: unknown): Promise<Jo
   const poops = poopsRaw.map((item) => parsePoop(item, true))
   const moods = moodsRaw.map((item) => parseMood(item, true))
   const waters = watersRaw.map((item) => parseWater(item, true))
+  const foodsRaw = Array.isArray(body.foods) ? body.foods : []
+  if (foodsRaw.length > MAX_ENTRIES) return bad('Backup has too many foods')
+  const customFoods = foodsRaw
+    .filter((item) => isRecord(item) && item.isCustom === true)
+    .map((item) => parseCustomFood(item, true))
   const dayNotes: Record<string, string> = {}
   if (isRecord(body.dayNotes)) {
     for (const [date, note] of Object.entries(body.dayNotes)) {
@@ -614,6 +716,8 @@ export async function importJournal(db: PrismaClient, body: unknown): Promise<Jo
     await tx.mood.deleteMany()
     await tx.water.deleteMany()
     await tx.dayNote.deleteMany()
+    await tx.foodItem.deleteMany({ where: { isCustom: true } })
+    for (const food of customFoods) await upsertCustomFood(tx, food)
     for (const meal of meals) await insertMeal(tx, meal)
     for (const entry of poops) await insertPoop(tx, entry)
     for (const entry of moods) await insertMood(tx, entry)
@@ -641,5 +745,7 @@ export async function exportJournal(db: PrismaClient) {
   return {
     ...journal,
     meals: journal.meals.map((meal) => ({ ...meal, ...byMeal.get(meal.id) })),
+    // Built-in foods are re-seeded on boot; a backup only needs the family's own foods.
+    foods: journal.foods.filter((food) => food.isCustom),
   }
 }

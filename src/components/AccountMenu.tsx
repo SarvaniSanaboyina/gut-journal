@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { MenuIcon } from './Icons'
 
 export function AccountMenu({
+  items,
   onChangeBirthDate,
   onSignOut,
 }: {
+  items?: { label: string; onSelect: () => void }[]
   onChangeBirthDate: () => void
   onSignOut: () => void
 }) {
@@ -41,6 +43,19 @@ export function AccountMenu({
       </button>
       {open && (
         <div className="menu-panel" role="menu">
+          {items?.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false)
+                item.onSelect()
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
           <button
             type="button"
             role="menuitem"

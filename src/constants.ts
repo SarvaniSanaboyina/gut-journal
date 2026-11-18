@@ -28,7 +28,7 @@ export const MEAL_TYPES: {
   { id: 'lunch', label: 'Lunch', hint: 'Midday meal' },
   { id: 'evening-snack', label: 'Evening snack', hint: 'After lunch' },
   { id: 'dinner', label: 'Dinner', hint: 'Evening meal' },
-  { id: 'mini-snack', label: 'Mini snack', hint: 'A little extra' },
+  { id: 'mini-snack', label: 'Other', hint: 'Mini snack or anything else' },
 ]
 
 export const MEAL_CONSISTENCIES: {

@@ -7,8 +7,19 @@ import {
   formatQuantity,
   mealDurationMinutes,
 } from '../meals'
-import type { MealEntry } from '../types'
+import { consumedPercent, consumptionLabel, formatAmount } from '../foods'
+import type { MealEntry, MealItem } from '../types'
 import { MealPhotoStrip } from './MealPhotos'
+
+function itemLine(item: MealItem) {
+  const percent = consumedPercent(item)
+  const amount = item.quantityServed != null
+    ? item.quantityConsumed != null
+      ? `${formatAmount(item.quantityConsumed, item.unit)} of ${formatAmount(item.quantityServed, item.unit)}`
+      : `${formatAmount(item.quantityServed, item.unit)} served`
+    : ''
+  return { percent, amount }
+}
 
 export function MealCard({
   entry,
@@ -18,16 +29,41 @@ export function MealCard({
   onSelect?: () => void
 }) {
   const duration = mealDurationMinutes(entry)
+  const hasItems = entry.items.length > 0
   const chips = [
     entry.quantity != null ? formatQuantity(entry.quantity, entry.quantityUnit) : '',
-    formatConsistency(entry.consistency, entry.consistencyPercent),
+    hasItems ? '' : formatConsistency(entry.consistency, entry.consistencyPercent),
+    entry.source ? entry.source[0].toUpperCase() + entry.source.slice(1) : '',
     entry.calories != null ? formatCalories(entry.calories) : '',
   ].filter(Boolean)
 
   const body = (
     <>
       <span className="meal-type">{mealLabel(entry.type)}</span>
-      <span className="title">{entry.foods}</span>
+      {hasItems ? (
+        <span className="meal-items">
+          {entry.items.map((item) => {
+            const { percent, amount } = itemLine(item)
+            return (
+              <span key={item.id} className={`meal-item ${percent === 0 ? 'refused' : ''}`}>
+                <span className="meal-item-name">
+                  {item.name}
+                  {item.ingredients.length > 0 && (
+                    <small> with {item.ingredients.map((child) => child.name).join(', ')}</small>
+                  )}
+                </span>
+                <span className="meal-item-amount">
+                  {amount}
+                  {amount && percent != null ? ' · ' : ''}
+                  {percent != null ? (percent === 0 ? 'Refused' : `${percent}%`) : consumptionLabel(null)}
+                </span>
+              </span>
+            )
+          })}
+        </span>
+      ) : (
+        <span className="title">{entry.foods}</span>
+      )}
       {chips.length > 0 && (
         <span className="meal-facts">
           {chips.map((chip) => (

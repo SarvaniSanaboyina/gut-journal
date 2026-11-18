@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   AuthError,
+  deleteFood,
   deleteMeal,
   deleteMood,
   deletePoop,
@@ -10,6 +11,7 @@ import {
   importJournal,
   OfflineError,
   setNote,
+  upsertFood as saveFood,
   upsertMeal as saveMeal,
   upsertMood as saveMood,
   upsertPoop as savePoop,
@@ -19,6 +21,7 @@ import { attachLegacyPhotos, clearLegacyPhotos } from './legacy'
 import { migrateMealType } from './meals'
 import { notifyPhotosChanged } from './photos'
 import type {
+  FoodEntry,
   JournalData,
   MealConsistency,
   MealEntry,
@@ -76,6 +79,8 @@ function normalize(raw: unknown): JournalData {
         notes: asString(item.notes),
         hasBeforePhoto: asBoolean(item.hasBeforePhoto) || Boolean(item.photoBefore),
         hasAfterPhoto: asBoolean(item.hasAfterPhoto) || Boolean(item.photoAfter),
+        source: '' as const,
+        items: [],
       }
     })
   }
@@ -258,6 +263,32 @@ export function useJournal() {
     }))
   }, [])
 
+  const upsertFood = useCallback(async (entry: FoodEntry) => {
+    const saved = await saveFood(entry)
+    setData((prev) => ({
+      ...prev,
+      foods: [...prev.foods.filter((item) => item.id !== saved.id), saved],
+    }))
+    return saved
+  }, [])
+
+  const removeFood = useCallback(async (id: string) => {
+    await deleteFood(id)
+    setData((prev) => ({
+      ...prev,
+      foods: prev.foods.filter((item) => item.id !== id),
+      // The server clears the food link on past meals and keeps the name.
+      meals: prev.meals.map((meal) => ({
+        ...meal,
+        items: meal.items.map((item) => ({
+          ...item,
+          foodId: item.foodId === id ? null : item.foodId,
+          ingredients: item.ingredients.map((child) => ({ ...child, foodId: child.foodId === id ? null : child.foodId })),
+        })),
+      })),
+    }))
+  }, [])
+
   const removeMeal = useCallback(async (id: string) => {
     await deleteMeal(id)
     setData((prev) => ({ ...prev, meals: prev.meals.filter((item) => item.id !== id) }))
@@ -330,6 +361,8 @@ export function useJournal() {
     upsertPoop,
     upsertMood,
     upsertWater,
+    upsertFood,
+    removeFood,
     removeMeal,
     removePoop,
     removeMood,

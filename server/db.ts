@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import pg from 'pg'
 import { PrismaPGlite } from 'pglite-prisma-adapter'
+import { seedFoodCatalog } from './foods.ts'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS meals (
@@ -94,6 +95,62 @@ CREATE TABLE IF NOT EXISTS sessions (
 CREATE INDEX IF NOT EXISTS sessions_account_idx ON sessions (account_id);
 
 ALTER TABLE meals ADD COLUMN IF NOT EXISTS calories double precision;
+ALTER TABLE meals ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT '';
+ALTER TABLE meals ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+
+CREATE TABLE IF NOT EXISTS food_items (
+  id text PRIMARY KEY,
+  name text NOT NULL CHECK (length(trim(name)) > 0),
+  aliases jsonb NOT NULL DEFAULT '[]',
+  category text NOT NULL,
+  food_groups jsonb NOT NULL DEFAULT '[]',
+  default_unit text NOT NULL,
+  default_qty double precision CHECK (default_qty IS NULL OR default_qty >= 0),
+  unit_grams jsonb NOT NULL DEFAULT '{}',
+  nutrients jsonb NOT NULL DEFAULT '{}',
+  nutrient_source text NOT NULL DEFAULT 'none',
+  ingredients jsonb NOT NULL DEFAULT '[]',
+  is_custom boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS food_items_custom_idx ON food_items (is_custom);
+
+CREATE TABLE IF NOT EXISTS meal_items (
+  id text PRIMARY KEY,
+  meal_id text NOT NULL REFERENCES meals(id) ON DELETE CASCADE,
+  parent_item_id text REFERENCES meal_items(id) ON DELETE CASCADE,
+  food_item_id text REFERENCES food_items(id) ON DELETE SET NULL,
+  food_name text NOT NULL CHECK (length(trim(food_name)) > 0),
+  quantity_served double precision CHECK (quantity_served IS NULL OR quantity_served >= 0),
+  quantity_consumed double precision CHECK (quantity_consumed IS NULL OR quantity_consumed >= 0),
+  unit text NOT NULL,
+  consumed_percent smallint CHECK (consumed_percent IS NULL OR consumed_percent BETWEEN 0 AND 100),
+  preparation text NOT NULL DEFAULT '',
+  notes text NOT NULL DEFAULT '',
+  position integer NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS meal_items_meal_idx ON meal_items (meal_id);
+CREATE INDEX IF NOT EXISTS meal_items_food_idx ON meal_items (food_item_id);
+
+CREATE TABLE IF NOT EXISTS record_revisions (
+  id text PRIMARY KEY,
+  entity text NOT NULL,
+  entity_id text NOT NULL,
+  action text NOT NULL,
+  data jsonb NOT NULL,
+  changed_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS record_revisions_entity_idx ON record_revisions (entity, entity_id);
+
+CREATE TABLE IF NOT EXISTS settings (
+  key text PRIMARY KEY,
+  value jsonb NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
 `
 
 export async function openDatabase(dataDir: string, databaseUrl = process.env.DATABASE_URL) {
@@ -102,6 +159,7 @@ export async function openDatabase(dataDir: string, databaseUrl = process.env.DA
     try {
       await pool.query(SCHEMA)
       const prisma = new PrismaClient({ adapter: new PrismaPg(pool) })
+      await seedFoodCatalog(prisma)
       return { prisma, kind: 'postgresql', close: () => pool.end() }
     } catch (error) {
       await pool.end()
@@ -111,6 +169,7 @@ export async function openDatabase(dataDir: string, databaseUrl = process.env.DA
   const pglite = await PGlite.create(dataDir)
   await pglite.exec(SCHEMA)
   const prisma = new PrismaClient({ adapter: new PrismaPGlite(pglite) })
+  await seedFoodCatalog(prisma)
   return { prisma, kind: 'pglite', close: () => pglite.close() }
 }
 

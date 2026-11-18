@@ -31,6 +31,7 @@ import {
   savePoop,
   saveWater,
 } from './journal.ts'
+import { removeCustomFood, saveCustomFood } from './foods.ts'
 
 const JSON_LIMIT = '32mb'
 const PHOTO_LIMIT = '8mb'
@@ -205,6 +206,15 @@ export function createApp(prisma: PrismaClient, options: { distDir?: string } = 
 
   app.delete('/api/waters/:id', async (req, res) => {
     await removeWater(prisma, param(req.params.id))
+    res.status(204).end()
+  })
+
+  app.put('/api/foods', async (req, res) => {
+    res.json(await saveCustomFood(prisma, req.body))
+  })
+
+  app.delete('/api/foods/:id', async (req, res) => {
+    await removeCustomFood(prisma, param(req.params.id))
     res.status(204).end()
   })
 

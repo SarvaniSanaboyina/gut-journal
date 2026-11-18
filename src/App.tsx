@@ -4,6 +4,7 @@ import { AccountMenu } from './components/AccountMenu'
 import { AuthScreen } from './components/AuthScreen'
 import { HistoryView } from './components/HistoryView'
 import { Chevron } from './components/Icons'
+import { FoodsManager } from './components/FoodsManager'
 import { MealForm } from './components/MealForm'
 import { Modal } from './components/Modal'
 import { MoodForm } from './components/MoodForm'
@@ -86,6 +87,7 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
   const [view, setView] = useState<View>('today')
   const [editor, setEditor] = useState<Editor | null>(null)
   const [birthDateOpen, setBirthDateOpen] = useState(false)
+  const [foodsOpen, setFoodsOpen] = useState(false)
 
   const title = useMemo(() => {
     if (isToday(date)) return 'Today'
@@ -104,6 +106,7 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
           </div>
         </div>
         <AccountMenu
+          items={[{ label: 'Food list', onSelect: () => setFoodsOpen(true) }]}
           onChangeBirthDate={() => setBirthDateOpen(true)}
           onSignOut={() => void onSignOut()}
         />
@@ -202,9 +205,9 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
         />
       )}
 
-      <nav className="tabs" hidden={Boolean(editor) || birthDateOpen || journal.status !== 'ready'}>
+      <nav className="tabs" hidden={Boolean(editor) || birthDateOpen || foodsOpen || journal.status !== 'ready'}>
         <button className={view === 'today' ? 'active' : ''} onClick={() => setView('today')}>
-          Today
+          Diary
         </button>
         <button className={view === 'reports' ? 'active' : ''} onClick={() => setView('reports')}>
           Reports
@@ -222,8 +225,10 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
           <MealForm
             date={date}
             initial={editor.entry}
-            logged={journal.data.meals.filter((item) => item.date === date)}
-            onSave={(entry) => persist(() => journal.upsertMeal(entry), () => setEditor(null))}
+            meals={journal.data.meals}
+            foods={journal.data.foods}
+            onSaveFood={journal.upsertFood}
+            onSave={(entry) => journal.upsertMeal(entry).then(() => setEditor(null))}
             onDelete={
               editor.entry
                 ? () => {
@@ -301,6 +306,12 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
             }
             onCancel={() => setEditor(null)}
           />
+        </Modal>
+      )}
+
+      {foodsOpen && (
+        <Modal title="Food list" onClose={() => setFoodsOpen(false)}>
+          <FoodsManager foods={journal.data.foods} onSave={journal.upsertFood} onDelete={journal.removeFood} />
         </Modal>
       )}
 
