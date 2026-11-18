@@ -420,8 +420,38 @@ export function MealForm({
           </div>
         )}
 
+        <div>
+          <span className="field-label">Texture</span>
+          <div className="choice-row" style={{ marginTop: 8 }}>
+            {MEAL_CONSISTENCIES.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`choice ${consistency === item.id ? 'selected' : ''}`}
+                onClick={() => setConsistency(item.id)}
+              >
+                {item.label}
+                <small>{item.hint}</small>
+              </button>
+            ))}
+          </div>
+        </div>
+        {consistency === 'semi-solid' && (
+          <label className="field">
+            <span>How thick? {consistencyPercent}% solid</span>
+            <input
+              type="range"
+              min="10"
+              max="90"
+              step="5"
+              value={consistencyPercent}
+              onChange={(event) => setConsistencyPercent(Number(event.target.value))}
+            />
+          </label>
+        )}
+
         <button type="button" className="link-btn" aria-expanded={more} onClick={() => setMore(!more)}>
-          {more ? 'Fewer details' : 'More details — where from, texture, photos, notes'}
+          {more ? 'Fewer details' : 'More details — where from, photos, notes'}
         </button>
 
         {more && (
@@ -448,36 +478,6 @@ export function MealForm({
               <input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
             </label>
             {duration != null && <div className="duration-chip">The meal took {formatDuration(duration)}</div>}
-
-            <div>
-              <span className="field-label">Texture</span>
-              <div className="choice-row" style={{ marginTop: 8 }}>
-                {MEAL_CONSISTENCIES.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={`choice ${consistency === item.id ? 'selected' : ''}`}
-                    onClick={() => setConsistency(item.id)}
-                  >
-                    {item.label}
-                    <small>{item.hint}</small>
-                  </button>
-                ))}
-              </div>
-            </div>
-            {consistency === 'semi-solid' && (
-              <label className="field">
-                <span>How thick? {consistencyPercent}% solid</span>
-                <input
-                  type="range"
-                  min="10"
-                  max="90"
-                  step="5"
-                  value={consistencyPercent}
-                  onChange={(event) => setConsistencyPercent(Number(event.target.value))}
-                />
-              </label>
-            )}
 
             <div>
               <span className="field-label">Photos</span>

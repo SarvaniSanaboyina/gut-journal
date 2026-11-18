@@ -32,7 +32,7 @@ export function MealCard({
   const hasItems = entry.items.length > 0
   const chips = [
     entry.quantity != null ? formatQuantity(entry.quantity, entry.quantityUnit) : '',
-    hasItems ? '' : formatConsistency(entry.consistency, entry.consistencyPercent),
+    formatConsistency(entry.consistency, entry.consistencyPercent),
     entry.source ? entry.source[0].toUpperCase() + entry.source.slice(1) : '',
     entry.calories != null ? formatCalories(entry.calories) : '',
   ].filter(Boolean)
