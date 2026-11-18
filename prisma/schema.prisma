@@ -239,3 +239,17 @@ model DailyMetric {
 
   @@map("daily_metrics")
 }
+
+model GrowthRecord {
+  id        String   @id
+  date      String
+  weightKg  Float?   @map("weight_kg")
+  heightCm  Float?   @map("height_cm")
+  position  String   @default("")
+  notes     String   @default("")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@index([date])
+  @@map("growth_records")
+}

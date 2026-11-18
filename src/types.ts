@@ -210,7 +210,20 @@ export interface JournalData {
   foods: FoodEntry[]
   symptoms: SymptomEntry[]
   dailyMetrics: DailyMetricEntry[]
+  growth: GrowthEntry[]
   settings: Settings
+}
+
+export type MeasurePosition = '' | 'lying' | 'standing'
+
+export interface GrowthEntry {
+  id: string
+  date: string
+  weightKg: number | null
+  heightCm: number | null
+  /** Lying length (under 2 years) or standing height (2 years and over), per WHO measurement practice. */
+  position: MeasurePosition
+  notes: string
 }
 
 export interface ChildProfile {
@@ -232,5 +245,6 @@ export const emptyJournal = (): JournalData => ({
   foods: [],
   symptoms: [],
   dailyMetrics: [],
+  growth: [],
   settings: { childProfile: { sex: '', birthDate: '' }, nutrientReferences: { custom: {} } },
 })

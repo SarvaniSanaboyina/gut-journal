@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   AuthError,
+  deleteAllData as wipeServer,
   deleteFood,
+  deleteGrowth,
   deleteMeal,
   deleteSymptom,
   deleteMood,
@@ -15,6 +17,7 @@ import {
   putSetting,
   setNote,
   upsertSymptom as saveSymptom,
+  upsertGrowth as saveGrowth,
   upsertFood as saveFood,
   upsertMeal as saveMeal,
   upsertMood as saveMood,
@@ -27,6 +30,7 @@ import { notifyPhotosChanged } from './photos'
 import type {
   ChildProfile,
   DailyMetricEntry,
+  GrowthEntry,
   Settings,
   FoodEntry,
   SymptomEntry,
@@ -201,7 +205,7 @@ export function useJournal() {
 
   const remember = useCallback((next: JournalData) => {
     notesRef.current = next.dayNotes
-    setData({ ...next, waters: next.waters ?? [], symptoms: next.symptoms ?? [], dailyMetrics: next.dailyMetrics ?? [], settings: next.settings ?? emptyJournal().settings })
+    setData({ ...next, waters: next.waters ?? [], symptoms: next.symptoms ?? [], dailyMetrics: next.dailyMetrics ?? [], growth: next.growth ?? [], settings: next.settings ?? emptyJournal().settings })
   }, [])
 
   useEffect(() => {
@@ -293,6 +297,24 @@ export function useJournal() {
       dailyMetrics: [...prev.dailyMetrics.filter((item) => item.date !== saved.date), saved],
     }))
   }, [])
+
+  const upsertGrowth = useCallback(async (entry: GrowthEntry) => {
+    const saved = await saveGrowth(entry)
+    setData((prev) => ({ ...prev, growth: [...prev.growth.filter((item) => item.id !== saved.id), saved] }))
+  }, [])
+
+  const removeGrowth = useCallback(async (id: string) => {
+    await deleteGrowth(id)
+    setData((prev) => ({ ...prev, growth: prev.growth.filter((item) => item.id !== id) }))
+  }, [])
+
+  const deleteEverything = useCallback(async () => {
+    for (const timer of noteTimers.current.values()) window.clearTimeout(timer)
+    noteTimers.current.clear()
+    const next = await wipeServer()
+    remember(next)
+    notifyPhotosChanged()
+  }, [remember])
 
   const saveChildProfile = useCallback(async (profile: ChildProfile) => {
     const saved = await putSetting('child-profile', profile)
@@ -407,6 +429,9 @@ export function useJournal() {
     upsertSymptom,
     removeSymptom,
     saveDailyMetric,
+    upsertGrowth,
+    removeGrowth,
+    deleteEverything,
     saveChildProfile,
     saveReferences,
     removeMeal,

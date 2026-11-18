@@ -63,6 +63,11 @@ export function formatLongDate(iso: string): string {
   })
 }
 
+/** Unambiguous date with year, e.g. "4 May 2023" — for records that span years (growth, reports). */
+export function formatDate(iso: string): string {
+  return parseISODate(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
 export function formatShortDate(iso: string): string {
   return parseISODate(iso).toLocaleDateString(undefined, {
     weekday: 'short',

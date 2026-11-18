@@ -11,6 +11,7 @@ import {
   type SymptomEntry,
 } from './gut.ts'
 import { importSettings, readSettings, type Settings } from './settings.ts'
+import { type GrowthEntry, insertGrowth, parseGrowth, readGrowth } from './growth.ts'
 import {
   bad,
   type Db,
@@ -126,6 +127,7 @@ export type JournalData = {
   foods: FoodEntry[]
   symptoms: SymptomEntry[]
   dailyMetrics: DailyMetricEntry[]
+  growth: GrowthEntry[]
   settings: Settings
 }
 
@@ -543,6 +545,7 @@ export async function readJournal(db: PrismaClient): Promise<JournalData> {
   const foods = await listFoods(db)
   const gut = await readGut(db)
   const settings = await readSettings(db)
+  const growth = await readGrowth(db)
   const dayNotes: Record<string, string> = {}
   for (const row of notes) dayNotes[row.date] = row.note
   return {
@@ -553,6 +556,7 @@ export async function readJournal(db: PrismaClient): Promise<JournalData> {
     dayNotes,
     foods,
     ...gut,
+    growth,
     settings,
   }
 }
@@ -697,6 +701,30 @@ function takePhoto(value: unknown, mealId: string, slot: PhotoSlot, photos: Inco
   photos.push({ mealId, slot, mime: parsed.mime, bytes: parsed.bytes })
 }
 
+/** Removes every journal record. The login (child's name and date of birth) is kept. */
+async function clearJournal(tx: Db, includeHistory = false) {
+  await tx.mealPhoto.deleteMany()
+  await tx.meal.deleteMany()
+  await tx.poop.deleteMany()
+  await tx.mood.deleteMany()
+  await tx.water.deleteMany()
+  await tx.dayNote.deleteMany()
+  await tx.symptom.deleteMany()
+  await tx.dailyMetric.deleteMany()
+  await tx.growthRecord.deleteMany()
+  await tx.foodItem.deleteMany({ where: { isCustom: true } })
+  if (includeHistory) {
+    await tx.setting.deleteMany()
+    await tx.recordRevision.deleteMany()
+  }
+}
+
+/** Permanently deletes all journal data, settings and edit history. */
+export async function deleteAllData(db: PrismaClient): Promise<JournalData> {
+  await db.$transaction(async (tx) => clearJournal(tx, true))
+  return readJournal(db)
+}
+
 export async function importJournal(db: PrismaClient, body: unknown): Promise<JournalData> {
   if (!isRecord(body)) return bad('Invalid backup')
   const mealsRaw = Array.isArray(body.meals) ? body.meals : []
@@ -737,6 +765,9 @@ export async function importJournal(db: PrismaClient, body: unknown): Promise<Jo
   const metricsRaw = Array.isArray(body.dailyMetrics) ? body.dailyMetrics : []
   if (symptomsRaw.length > MAX_ENTRIES || metricsRaw.length > MAX_ENTRIES) return bad('Backup has too many entries')
   const symptoms = symptomsRaw.map((item) => parseSymptom(item, true))
+  const growthRaw = Array.isArray(body.growth) ? body.growth : []
+  if (growthRaw.length > MAX_ENTRIES) return bad('Backup has too many growth records')
+  const growth = growthRaw.map((item) => parseGrowth(item, true))
   const metrics = metricsRaw.map((item) => parseMetric(item, isRecord(item) ? item.date : null))
   const customFoods = foodsRaw
     .filter((item) => isRecord(item) && item.isCustom === true)
@@ -752,20 +783,13 @@ export async function importJournal(db: PrismaClient, body: unknown): Promise<Jo
   }
 
   await db.$transaction(async (tx) => {
-    await tx.mealPhoto.deleteMany()
-    await tx.meal.deleteMany()
-    await tx.poop.deleteMany()
-    await tx.mood.deleteMany()
-    await tx.water.deleteMany()
-    await tx.dayNote.deleteMany()
-    await tx.symptom.deleteMany()
-    await tx.dailyMetric.deleteMany()
-    await tx.foodItem.deleteMany({ where: { isCustom: true } })
+    await clearJournal(tx)
     for (const food of customFoods) await upsertCustomFood(tx, food)
     for (const meal of meals) await insertMeal(tx, meal)
     for (const entry of poops) await insertPoop(tx, entry)
     for (const entry of symptoms) await insertSymptom(tx, entry)
     for (const entry of metrics) await insertMetric(tx, entry)
+    for (const entry of growth) await insertGrowth(tx, entry)
     if (isRecord(body.settings)) await importSettings(tx, body.settings)
     for (const entry of moods) await insertMood(tx, entry)
     for (const entry of waters) await insertWater(tx, entry)

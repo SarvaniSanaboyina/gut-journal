@@ -229,3 +229,112 @@ export function PresenceGrid({
     </ChartFrame>
   )
 }
+
+/**
+ * Measurements over age against reference curves (e.g. WHO percentile lines). One child series,
+ * reference lines labelled directly at their right end; hover or focus a point for its values.
+ */
+export function GrowthChart({
+  title,
+  subtitle,
+  unit,
+  xDomain,
+  curves,
+  points,
+  table,
+}: {
+  title: string
+  subtitle?: string
+  unit: string
+  /** Age range in months. */
+  xDomain: [number, number]
+  curves: { label: string; emphasis?: boolean; points: [number, number][] }[]
+  points: { key: string; x: number; y: number; full: string; detail: string }[]
+  table: { head: string[]; rows: (string | number)[][] }
+}) {
+  const [active, setActive] = useState<string | null>(null)
+  const W = 360
+  const H = 220
+  const pad = { l: 34, r: 34, t: 10, b: 26 }
+  const ys = [...curves.flatMap((curve) => curve.points.map((point) => point[1])), ...points.map((point) => point.y)]
+  const rawMin = Math.min(...ys)
+  const rawMax = Math.max(...ys)
+  const span = Math.max(rawMax - rawMin, 1)
+  const step = niceStep(span / 4)
+  const yMin = Math.floor((rawMin - span * 0.04) / step) * step
+  const yMax = Math.ceil((rawMax + span * 0.04) / step) * step
+  const [x0, x1] = xDomain
+  const sx = (x: number) => pad.l + ((x - x0) / Math.max(x1 - x0, 1)) * (W - pad.l - pad.r)
+  const sy = (y: number) => pad.t + (1 - (y - yMin) / (yMax - yMin)) * (H - pad.t - pad.b)
+  const yTicks: number[] = []
+  for (let value = yMin; value <= yMax + 1e-9; value += step) yTicks.push(Math.round(value * 100) / 100)
+  const monthStep = x1 - x0 > 30 ? 12 : x1 - x0 > 12 ? 6 : 3
+  const xTicks: number[] = []
+  for (let m = Math.ceil(x0 / monthStep) * monthStep; m <= x1; m += monthStep) xTicks.push(m)
+  const path = (pts: [number, number][]) => pts.map((p, i) => `${i ? 'L' : 'M'}${sx(p[0]).toFixed(1)},${sy(p[1]).toFixed(1)}`).join('')
+  const sorted = [...points].sort((a, b) => a.x - b.x)
+  const current = sorted.find((point) => point.key === active)
+
+  return (
+    <ChartFrame title={title} subtitle={subtitle} table={table}>
+      <div className="growth-chart" onMouseLeave={() => setActive(null)}>
+        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${title}: ${points.length} measurement${points.length === 1 ? '' : 's'}`}>
+          {yTicks.map((tick) => (
+            <g key={tick}>
+              <line className="grid" x1={pad.l} x2={W - pad.r} y1={sy(tick)} y2={sy(tick)} />
+              <text className="axis" x={pad.l - 5} y={sy(tick) + 3} textAnchor="end">{tick}</text>
+            </g>
+          ))}
+          {xTicks.map((tick) => (
+            <text key={tick} className="axis" x={sx(tick)} y={H - 8} textAnchor="middle">
+              {tick % 12 === 0 ? `${tick / 12}y` : `${Math.floor(tick / 12)}y${tick % 12}m`}
+            </text>
+          ))}
+          <line className="baseline" x1={pad.l} x2={W - pad.r} y1={H - pad.b} y2={H - pad.b} />
+          {curves.map((curve) => {
+            const last = curve.points[curve.points.length - 1]
+            return (
+              <g key={curve.label} className={`ref-curve ${curve.emphasis ? 'emphasis' : ''}`}>
+                <path d={path(curve.points)} />
+                <text x={sx(last[0]) + 4} y={sy(last[1]) + 3}>{curve.label}</text>
+              </g>
+            )
+          })}
+          {sorted.length > 1 && <path className="child-line" d={path(sorted.map((point) => [point.x, point.y]))} />}
+          {sorted.map((point) => (
+            <g
+              key={point.key}
+              tabIndex={0}
+              role="button"
+              aria-label={`${point.full}: ${point.detail}`}
+              onMouseEnter={() => setActive(point.key)}
+              onFocus={() => setActive(point.key)}
+              onBlur={() => setActive(null)}
+              onClick={() => setActive(point.key)}
+            >
+              <circle className="hit" cx={sx(point.x)} cy={sy(point.y)} r={11} />
+              <circle className={`child-dot ${active === point.key ? 'active' : ''}`} cx={sx(point.x)} cy={sy(point.y)} r={4} />
+            </g>
+          ))}
+        </svg>
+        <span className="growth-unit">{unit}</span>
+        {current && (
+          <span
+            className={`tooltip ${sx(current.x) > W / 2 ? 'end' : 'start'}`}
+            role="tooltip"
+            style={{ left: sx(current.x) > W / 2 ? undefined : `${(sx(current.x) / W) * 100}%`, right: sx(current.x) > W / 2 ? `${100 - (sx(current.x) / W) * 100}%` : undefined, top: `calc(${(sy(current.y) / H) * 100}% - 8px)`, transform: 'translateY(-100%)' }}
+          >
+            <b>{current.full}</b>
+            <span>{current.detail}</span>
+          </span>
+        )}
+      </div>
+    </ChartFrame>
+  )
+}
+
+function niceStep(raw: number) {
+  const power = 10 ** Math.floor(Math.log10(raw))
+  const unit = raw / power
+  return (unit <= 1 ? 1 : unit <= 2 ? 2 : unit <= 5 ? 5 : 10) * power
+}

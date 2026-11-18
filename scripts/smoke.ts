@@ -130,6 +130,18 @@ try {
   const unknown = await call('PUT', '/api/settings/theme', {})
   check('unknown setting rejected', unknown.status === 400)
 
+  // Phase 4: growth records
+  const growth = await call('PUT', '/api/growth', { id: 'g-1', date: '2025-05-04', weightKg: 12.2, heightCm: 86.4, position: 'standing' })
+  check('growth record saved', growth.status === 200 && growth.json.heightCm === 86.4 && growth.json.position === 'standing')
+  const growthEmpty = await call('PUT', '/api/growth', { id: 'g-2', date: '2025-05-04' })
+  check('growth record needs weight or height', growthEmpty.status === 400)
+  const growthGrams = await call('PUT', '/api/growth', { id: 'g-3', date: '2025-05-04', weightKg: 0.5 })
+  check('implausible weight rejected', growthGrams.status === 400)
+  const growthEdit = await call('PUT', '/api/growth', { id: 'g-1', date: '2025-05-04', weightKg: 12.4, heightCm: 86.4, position: 'standing' })
+  check('growth record updated', growthEdit.json.weightKg === 12.4)
+  const growthRevisions = await db.prisma.recordRevision.count({ where: { entity: 'growth', entityId: 'g-1' } })
+  check('growth edit kept a revision', growthRevisions === 1)
+
   const backup = await call('GET', '/api/export')
   check('export has only custom foods', backup.json.foods.every((f: any) => f.isCustom))
   const restored = await call('POST', '/api/import', backup.json)
@@ -137,6 +149,20 @@ try {
   check('backup round-trip keeps symptoms', restored.json.symptoms[0]?.reactions?.length === 1 && restored.json.dailyMetrics.length === 1)
   check('backup round-trip keeps settings', restored.json.settings.childProfile.birthDate === '2023-05-04')
   check('backup round-trip keeps blood flag', restored.json.poops[0]?.visibleBlood === true)
+  check('backup round-trip keeps growth', restored.json.growth.length === 1 && restored.json.growth[0].weightKg === 12.4)
+
+  const refuseWipe = await call('POST', '/api/delete-all', {})
+  check('delete-all needs confirmation', refuseWipe.status === 400)
+  const wiped = await call('POST', '/api/delete-all', { confirm: 'DELETE' })
+  check(
+    'delete-all clears journal',
+    wiped.status === 200 && wiped.json.meals.length === 0 && wiped.json.poops.length === 0 && wiped.json.symptoms.length === 0 && wiped.json.growth.length === 0 && wiped.json.foods.every((f: any) => !f.isCustom),
+  )
+  check('delete-all clears settings', wiped.json.settings.childProfile.birthDate === '')
+  check('delete-all clears edit history and photos', (await db.prisma.recordRevision.count()) === 0 && (await db.prisma.mealPhoto.count()) === 0)
+  check('built-in foods remain after delete-all', wiped.json.foods.length > 50)
+  const stillSignedIn = await call('GET', '/api/journal')
+  check('login still works after delete-all', stillSignedIn.status === 200)
 } finally {
   server.close()
   await db.prisma.$disconnect()

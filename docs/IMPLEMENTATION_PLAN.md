@@ -47,3 +47,13 @@ Indexes on every `(date, time)`, `meal_items(meal_id)`, `food_reactions(symptom_
 4. **Reports** — food-vs-gut timeline, weekly/monthly/custom reports with period comparison, growth records + WHO 0–5 y percentile estimates (official WHO `anthro` LMS tables), printable/PDF pediatrician report, data export and delete-all.
 
 Each phase ends with `pnpm build`, `pnpm lint`, an API smoke test against a throwaway PGlite database, and a Playwright pass at phone and desktop widths.
+
+## Phase 4 notes
+
+- `growth_records` table (weight 1–60 kg, height 40–150 cm, lying/standing) with revisions, backup and CSV export.
+- WHO z-scores/percentiles in `src/growth.ts` use the WHO `anthro` LMS tables (weight-, length/height- and BMI-for-age, 0–1826 days),
+  sampled every 7 days into `src/whoTables.ts` by `scripts/who-tables.py`; linear interpolation stays within 0.001 z of the daily tables.
+  The restricted method applies beyond ±3 SD for weight and BMI, and a ±0.7 cm correction applies when the measuring position does not match the age.
+- Reports tab: Summary (week / month / custom, compared with the previous period), Food & gut timeline (food highlight + "within N h after"), Growth.
+- Pediatrician report: full-screen printable sheet; the browser's print dialog saves it as a PDF.
+- Your data (☰ menu): JSON backup, CSV exports, and `POST /api/delete-all`, which requires `{ "confirm": "DELETE" }`, wipes all journal data, settings and edit history, and keeps the login.

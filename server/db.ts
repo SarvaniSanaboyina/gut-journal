@@ -192,6 +192,20 @@ CREATE TABLE IF NOT EXISTS daily_metrics (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS growth_records (
+  id text PRIMARY KEY,
+  date text NOT NULL,
+  weight_kg double precision CHECK (weight_kg IS NULL OR weight_kg BETWEEN 1 AND 60),
+  height_cm double precision CHECK (height_cm IS NULL OR height_cm BETWEEN 40 AND 150),
+  position text NOT NULL DEFAULT '' CHECK (position IN ('', 'lying', 'standing')),
+  notes text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (weight_kg IS NOT NULL OR height_cm IS NOT NULL)
+);
+
+CREATE INDEX IF NOT EXISTS growth_records_date_idx ON growth_records (date);
+
 CREATE TABLE IF NOT EXISTS settings (
   key text PRIMARY KEY,
   value jsonb NOT NULL,

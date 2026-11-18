@@ -1,4 +1,4 @@
-import type { DailyMetricEntry, FoodEntry, JournalData, MealEntry, MoodEntry, PoopEntry, SymptomEntry, WaterEntry } from './types'
+import type { DailyMetricEntry, FoodEntry, GrowthEntry, JournalData, MealEntry, MoodEntry, PoopEntry, SymptomEntry, WaterEntry } from './types'
 
 type PhotoSlot = 'before' | 'after' | 'stool'
 
@@ -132,6 +132,22 @@ export async function deleteSymptom(id: string) {
 
 export function putDailyMetric(entry: DailyMetricEntry) {
   return sendJson<DailyMetricEntry>(`/api/daily/${encodeURIComponent(entry.date)}`, putJson(entry))
+}
+
+export function upsertGrowth(entry: GrowthEntry) {
+  return sendJson<GrowthEntry>('/api/growth', putJson(entry))
+}
+
+export async function deleteGrowth(id: string) {
+  await send(`/api/growth/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export function deleteAllData() {
+  return sendJson<JournalData>('/api/delete-all', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ confirm: 'DELETE' }),
+  })
 }
 
 export function putSetting<T>(key: 'child-profile' | 'nutrient-references', value: T) {

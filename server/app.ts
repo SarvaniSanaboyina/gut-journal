@@ -14,6 +14,7 @@ import {
 import {
   HttpError,
   checkPhotoMime,
+  deleteAllData,
   exportJournal,
   importJournal,
   parsePhotoSlot,
@@ -34,6 +35,7 @@ import {
 import { removeCustomFood, saveCustomFood } from './foods.ts'
 import { removeSymptom, saveMetric, saveSymptom } from './gut.ts'
 import { saveSetting } from './settings.ts'
+import { removeGrowth, saveGrowth } from './growth.ts'
 
 const JSON_LIMIT = '32mb'
 const PHOTO_LIMIT = '8mb'
@@ -235,6 +237,23 @@ export function createApp(prisma: PrismaClient, options: { distDir?: string } = 
   app.delete('/api/foods/:id', async (req, res) => {
     await removeCustomFood(prisma, param(req.params.id))
     res.status(204).end()
+  })
+
+  app.put('/api/growth', async (req, res) => {
+    res.json(await saveGrowth(prisma, req.body))
+  })
+
+  app.delete('/api/growth/:id', async (req, res) => {
+    await removeGrowth(prisma, param(req.params.id))
+    res.status(204).end()
+  })
+
+  // Permanently deletes every journal record. The client must send the exact phrase so a stray
+  // request (or a misclick that skips the confirmation screen) cannot wipe the journal.
+  app.post('/api/delete-all', async (req, res) => {
+    const body = req.body as { confirm?: unknown } | undefined
+    if (body?.confirm !== 'DELETE') throw new HttpError(400, 'Type DELETE to confirm')
+    res.json(await deleteAllData(prisma))
   })
 
   app.put('/api/notes/:date', async (req, res) => {

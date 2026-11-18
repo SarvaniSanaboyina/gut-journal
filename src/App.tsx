@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from './auth'
 import { AccountMenu } from './components/AccountMenu'
+import { DataPanel } from './components/DataPanel'
 import { AuthScreen } from './components/AuthScreen'
 import { HistoryView } from './components/HistoryView'
 import { Chevron } from './components/Icons'
@@ -94,6 +95,7 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
   const [editor, setEditor] = useState<Editor | null>(null)
   const [birthDateOpen, setBirthDateOpen] = useState(false)
   const [foodsOpen, setFoodsOpen] = useState(false)
+  const [dataOpen, setDataOpen] = useState(false)
 
   const title = useMemo(() => {
     if (isToday(date)) return 'Today'
@@ -114,6 +116,7 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
         <AccountMenu
           items={[
             { label: 'History & backup', onSelect: () => setView('history') },
+            { label: 'Your data: export & delete', onSelect: () => setDataOpen(true) },
             { label: 'Food list', onSelect: () => setFoodsOpen(true) },
           ]}
           onChangeBirthDate={() => setBirthDateOpen(true)}
@@ -217,11 +220,14 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
         <ReportsView
           date={date}
           data={journal.data}
+          childName={userName}
           onChangeDate={setDate}
-          onSelectDate={(iso) => {
-            setDate(iso)
-            setView('today')
-          }}
+          onEditMeal={(entry) => setEditor({ kind: 'meal', entry })}
+          onEditPoop={(entry) => setEditor({ kind: 'poop', entry })}
+          onEditSymptom={(entry) => setEditor({ kind: 'symptom', entry })}
+          onSaveGrowth={journal.upsertGrowth}
+          onDeleteGrowth={journal.removeGrowth}
+          onSaveProfile={journal.saveChildProfile}
         />
       )}
 
@@ -237,7 +243,7 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
         />
       )}
 
-      <nav className="tabs" hidden={Boolean(editor) || birthDateOpen || foodsOpen || journal.status !== 'ready'}>
+      <nav className="tabs" hidden={Boolean(editor) || birthDateOpen || foodsOpen || dataOpen || journal.status !== 'ready'}>
         <button className={view === 'today' ? 'active' : ''} onClick={() => setView('today')}>
           Diary
         </button>
@@ -376,6 +382,12 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
             onSave={(entry) => journal.saveDailyMetric(entry).then(() => setEditor(null))}
             onCancel={() => setEditor(null)}
           />
+        </Modal>
+      )}
+
+      {dataOpen && (
+        <Modal title="Your data" onClose={() => setDataOpen(false)}>
+          <DataPanel data={journal.data} onExport={journal.exportBackup} onDeleteAll={journal.deleteEverything} onClose={() => setDataOpen(false)} />
         </Modal>
       )}
 
