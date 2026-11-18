@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { deletePhoto as deleteStoredPhoto, fetchPhoto, putPhoto as storePhoto } from './api'
 
-export type PhotoSlot = 'before' | 'after'
+export type PhotoSlot = 'before' | 'after' | 'stool'
 
 let epoch = 0
 const listeners = new Set<() => void>()

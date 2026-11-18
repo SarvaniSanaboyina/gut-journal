@@ -4,7 +4,10 @@ import { AccountMenu } from './components/AccountMenu'
 import { AuthScreen } from './components/AuthScreen'
 import { HistoryView } from './components/HistoryView'
 import { Chevron } from './components/Icons'
+import { CheckInForm } from './components/CheckInForm'
 import { FoodsManager } from './components/FoodsManager'
+import { GutView } from './components/GutView'
+import { SymptomForm } from './components/SymptomForm'
 import { MealForm } from './components/MealForm'
 import { Modal } from './components/Modal'
 import { MoodForm } from './components/MoodForm'
@@ -16,14 +19,16 @@ import { ReportsView } from './components/ReportsView'
 import { journalTitle } from './constants'
 import { formatLongDate, isToday, shiftDate, todayISO } from './dates'
 import { useJournal } from './storage'
-import type { MealEntry, MoodEntry, PoopEntry, WaterEntry } from './types'
+import type { MealEntry, MoodEntry, PoopEntry, SymptomEntry, WaterEntry } from './types'
 
-type View = 'today' | 'reports' | 'history'
+type View = 'today' | 'gut' | 'reports' | 'history'
 type Editor =
   | { kind: 'meal'; entry?: MealEntry }
   | { kind: 'poop'; entry?: PoopEntry }
   | { kind: 'mood'; entry?: MoodEntry }
   | { kind: 'water'; entry?: WaterEntry }
+  | { kind: 'symptom'; entry?: SymptomEntry }
+  | { kind: 'checkin' }
 
 async function persist(action: () => Promise<unknown>, onDone?: () => void) {
   try {
@@ -172,12 +177,25 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
           onAddPoop={() => setEditor({ kind: 'poop' })}
           onAddMood={() => setEditor({ kind: 'mood' })}
           onAddWater={() => setEditor({ kind: 'water' })}
+          onAddSymptom={() => setEditor({ kind: 'symptom' })}
+          onCheckIn={() => setEditor({ kind: 'checkin' })}
+          onEditSymptom={(entry) => setEditor({ kind: 'symptom', entry })}
           onEditMeal={(entry) => setEditor({ kind: 'meal', entry })}
           onEditPoop={(entry) => setEditor({ kind: 'poop', entry })}
           onEditMood={(entry) => setEditor({ kind: 'mood', entry })}
           onEditWater={(entry) => setEditor({ kind: 'water', entry })}
           onNoteChange={(note) => journal.setDayNote(date, note)}
           onNoteBlur={() => journal.flushDayNote(date)}
+        />
+      )}
+
+      {journal.status === 'ready' && view === 'gut' && (
+        <GutView
+          data={journal.data}
+          onAddPoop={() => setEditor({ kind: 'poop' })}
+          onAddSymptom={() => setEditor({ kind: 'symptom' })}
+          onEditPoop={(entry) => setEditor({ kind: 'poop', entry })}
+          onEditSymptom={(entry) => setEditor({ kind: 'symptom', entry })}
         />
       )}
 
@@ -208,6 +226,9 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
       <nav className="tabs" hidden={Boolean(editor) || birthDateOpen || foodsOpen || journal.status !== 'ready'}>
         <button className={view === 'today' ? 'active' : ''} onClick={() => setView('today')}>
           Diary
+        </button>
+        <button className={view === 'gut' ? 'active' : ''} onClick={() => setView('gut')}>
+          Gut
         </button>
         <button className={view === 'reports' ? 'active' : ''} onClick={() => setView('reports')}>
           Reports
@@ -244,13 +265,14 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
 
       {editor?.kind === 'poop' && (
         <Modal
-          title={editor.entry ? 'Edit poop' : 'Log a poop'}
+          title={editor.entry ? 'Edit bowel movement' : 'Log a bowel movement'}
           onClose={() => setEditor(null)}
         >
           <PoopForm
             date={date}
             initial={editor.entry}
-            onSave={(entry) => persist(() => journal.upsertPoop(entry), () => setEditor(null))}
+            sameDay={journal.data.poops.filter((item) => item.date === date && item.id !== editor.entry?.id).length}
+            onSave={(entry) => journal.upsertPoop(entry).then(() => setEditor(null))}
             onDelete={
               editor.entry
                 ? () => {
@@ -304,6 +326,40 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
                   }
                 : undefined
             }
+            onCancel={() => setEditor(null)}
+          />
+        </Modal>
+      )}
+
+      {editor?.kind === 'symptom' && (
+        <Modal title={editor.entry ? 'Edit symptom' : 'Log a symptom'} onClose={() => setEditor(null)}>
+          <SymptomForm
+            date={date}
+            initial={editor.entry}
+            data={journal.data}
+            onSave={async (entries) => {
+              for (const entry of entries) await journal.upsertSymptom(entry)
+              setEditor(null)
+            }}
+            onDelete={
+              editor.entry
+                ? () => {
+                    if (!window.confirm('Delete this symptom and any suspected foods marked with it?')) return
+                    void persist(() => journal.removeSymptom(editor.entry!.id), () => setEditor(null))
+                  }
+                : undefined
+            }
+            onCancel={() => setEditor(null)}
+          />
+        </Modal>
+      )}
+
+      {editor?.kind === 'checkin' && (
+        <Modal title="Daily check-in" onClose={() => setEditor(null)}>
+          <CheckInForm
+            date={date}
+            initial={journal.data.dailyMetrics.find((item) => item.date === date)}
+            onSave={(entry) => journal.saveDailyMetric(entry).then(() => setEditor(null))}
             onCancel={() => setEditor(null)}
           />
         </Modal>

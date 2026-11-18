@@ -2,6 +2,15 @@ import type { Meal, MealItem, Mood, Poop, PrismaClient, Water } from '@prisma/cl
 import { FOOD_UNITS, type FoodUnit } from './foodCatalog.ts'
 import { type FoodEntry, listFoods, parseCustomFood, upsertCustomFood } from './foods.ts'
 import {
+  type DailyMetricEntry,
+  insertMetric,
+  insertSymptom,
+  parseMetric,
+  parseSymptom,
+  readGut,
+  type SymptomEntry,
+} from './gut.ts'
+import {
   bad,
   type Db,
   isRecord,
@@ -35,7 +44,7 @@ const COLORS = ['brown', 'yellow', 'green', 'black', 'red', 'pale', 'other'] as 
 const AMOUNTS = ['small', 'medium', 'large'] as const
 const MOODS = ['happy', 'calm', 'fussy', 'tired', 'irritable', 'energetic', 'tummy'] as const
 const WATER_UNITS = ['ml', 'sips', 'cups'] as const
-const PHOTO_SLOTS = ['before', 'after'] as const
+const PHOTO_SLOTS = ['before', 'after', 'stool'] as const
 const MEAL_SOURCES = ['', 'homemade', 'packaged', 'restaurant'] as const
 const MAX_ITEMS = 40
 const MAX_INGREDIENTS = 20
@@ -85,6 +94,8 @@ export type PoopEntry = {
   straining: boolean
   pain: boolean
   mucus: boolean
+  visibleBlood: boolean
+  hasPhoto: boolean
   notes: string
 }
 
@@ -112,6 +123,8 @@ export type JournalData = {
   waters: WaterEntry[]
   dayNotes: Record<string, string>
   foods: FoodEntry[]
+  symptoms: SymptomEntry[]
+  dailyMetrics: DailyMetricEntry[]
 }
 
 const MAX_ENTRIES = 10000
@@ -181,6 +194,8 @@ function poopFromRow(row: Poop): PoopEntry {
     straining: row.straining === true,
     pain: row.pain === true,
     mucus: row.mucus === true,
+    visibleBlood: row.visibleBlood === true,
+    hasPhoto: row.hasPhoto === true,
     notes: row.notes,
   }
 }
@@ -304,6 +319,8 @@ function parsePoop(value: unknown, loose = false): PoopEntry {
     straining: parseFlag(value.straining),
     pain: parseFlag(value.pain),
     mucus: parseFlag(value.mucus),
+    visibleBlood: parseFlag(value.visibleBlood),
+    hasPhoto: parseFlag(value.hasPhoto),
     notes: parseText(value.notes, MAX_TEXT),
   }
 }
@@ -341,7 +358,7 @@ function photoBytes(value: unknown): Uint8Array {
 }
 
 export function parsePhotoSlot(value: string): PhotoSlot {
-  if (value === 'before' || value === 'after') return value
+  if (value === 'before' || value === 'after' || value === 'stool') return value
   return bad('Invalid photo')
 }
 
@@ -432,6 +449,8 @@ async function insertPoop(db: Db, entry: PoopEntry) {
     straining: entry.straining,
     pain: entry.pain,
     mucus: entry.mucus,
+    visibleBlood: entry.visibleBlood,
+    hasPhoto: entry.hasPhoto,
     notes: entry.notes,
   }
   await db.poop.upsert({
@@ -446,6 +465,8 @@ async function insertPoop(db: Db, entry: PoopEntry) {
       straining: data.straining,
       pain: data.pain,
       mucus: data.mucus,
+      visibleBlood: data.visibleBlood,
+      hasPhoto: data.hasPhoto,
       notes: data.notes,
     },
   })
@@ -500,7 +521,9 @@ async function insertPhoto(db: Db, mealId: string, slot: PhotoSlot, mime: string
     create: { mealId, slot, mime, bytes: payload },
     update: { mime, bytes: payload },
   })
-  if (slot === 'before') {
+  if (slot === 'stool') {
+    await db.poop.updateMany({ where: { id: mealId }, data: { hasPhoto: true } })
+  } else if (slot === 'before') {
     await db.meal.updateMany({ where: { id: mealId }, data: { hasBeforePhoto: true } })
   } else {
     await db.meal.updateMany({ where: { id: mealId }, data: { hasAfterPhoto: true } })
@@ -516,6 +539,7 @@ export async function readJournal(db: PrismaClient): Promise<JournalData> {
     db.dayNote.findMany({ orderBy: { date: 'asc' } }),
   ])
   const foods = await listFoods(db)
+  const gut = await readGut(db)
   const dayNotes: Record<string, string> = {}
   for (const row of notes) dayNotes[row.date] = row.note
   return {
@@ -525,6 +549,7 @@ export async function readJournal(db: PrismaClient): Promise<JournalData> {
     waters: waters.map(waterFromRow),
     dayNotes,
     foods,
+    ...gut,
   }
 }
 
@@ -562,6 +587,7 @@ export async function removePoop(db: PrismaClient, id: string) {
   await db.$transaction(async (tx) => {
     const existing = await tx.poop.findUnique({ where: { id: poopId } })
     if (existing) await recordRevision(tx, 'poop', poopId, 'delete', poopFromRow(existing))
+    await tx.mealPhoto.deleteMany({ where: { mealId: poopId, slot: 'stool' } })
     await tx.poop.deleteMany({ where: { id: poopId } })
   })
 }
@@ -649,7 +675,9 @@ export async function removePhoto(db: PrismaClient, mealId: string, slot: PhotoS
   const id = parseId(mealId)
   await db.$transaction(async (tx) => {
     await tx.mealPhoto.deleteMany({ where: { mealId: id, slot } })
-    if (slot === 'before') {
+    if (slot === 'stool') {
+      await tx.poop.updateMany({ where: { id }, data: { hasPhoto: false } })
+    } else if (slot === 'before') {
       await tx.meal.updateMany({ where: { id }, data: { hasBeforePhoto: false } })
     } else {
       await tx.meal.updateMany({ where: { id }, data: { hasAfterPhoto: false } })
@@ -691,11 +719,21 @@ export async function importJournal(db: PrismaClient, body: unknown): Promise<Jo
     if (photos.some((photo) => photo.mealId === meal.id && photo.slot === 'after')) meal.hasAfterPhoto = true
     return meal
   })
-  const poops = poopsRaw.map((item) => parsePoop(item, true))
+  const poops = poopsRaw.map((item) => {
+    const entry = parsePoop(item, true)
+    if (isRecord(item)) takePhoto(item.photo, entry.id, 'stool', photos)
+    entry.hasPhoto = photos.some((photo) => photo.mealId === entry.id && photo.slot === 'stool')
+    return entry
+  })
   const moods = moodsRaw.map((item) => parseMood(item, true))
   const waters = watersRaw.map((item) => parseWater(item, true))
   const foodsRaw = Array.isArray(body.foods) ? body.foods : []
   if (foodsRaw.length > MAX_ENTRIES) return bad('Backup has too many foods')
+  const symptomsRaw = Array.isArray(body.symptoms) ? body.symptoms : []
+  const metricsRaw = Array.isArray(body.dailyMetrics) ? body.dailyMetrics : []
+  if (symptomsRaw.length > MAX_ENTRIES || metricsRaw.length > MAX_ENTRIES) return bad('Backup has too many entries')
+  const symptoms = symptomsRaw.map((item) => parseSymptom(item, true))
+  const metrics = metricsRaw.map((item) => parseMetric(item, isRecord(item) ? item.date : null))
   const customFoods = foodsRaw
     .filter((item) => isRecord(item) && item.isCustom === true)
     .map((item) => parseCustomFood(item, true))
@@ -716,10 +754,14 @@ export async function importJournal(db: PrismaClient, body: unknown): Promise<Jo
     await tx.mood.deleteMany()
     await tx.water.deleteMany()
     await tx.dayNote.deleteMany()
+    await tx.symptom.deleteMany()
+    await tx.dailyMetric.deleteMany()
     await tx.foodItem.deleteMany({ where: { isCustom: true } })
     for (const food of customFoods) await upsertCustomFood(tx, food)
     for (const meal of meals) await insertMeal(tx, meal)
     for (const entry of poops) await insertPoop(tx, entry)
+    for (const entry of symptoms) await insertSymptom(tx, entry)
+    for (const entry of metrics) await insertMetric(tx, entry)
     for (const entry of moods) await insertMood(tx, entry)
     for (const entry of waters) await insertWater(tx, entry)
     for (const [date, note] of Object.entries(dayNotes)) {
@@ -735,9 +777,14 @@ export async function exportJournal(db: PrismaClient) {
   const journal = await readJournal(db)
   const photos = await db.mealPhoto.findMany()
   const byMeal = new Map<string, { photoBefore?: string; photoAfter?: string }>()
+  const stoolPhotos = new Map<string, string>()
   for (const row of photos) {
     const extra = byMeal.get(row.mealId) ?? {}
     const url = `data:${row.mime};base64,${Buffer.from(photoBytes(row.bytes)).toString('base64')}`
+    if (row.slot === 'stool') {
+      stoolPhotos.set(row.mealId, url)
+      continue
+    }
     if (row.slot === 'before') extra.photoBefore = url
     else extra.photoAfter = url
     byMeal.set(row.mealId, extra)
@@ -745,6 +792,7 @@ export async function exportJournal(db: PrismaClient) {
   return {
     ...journal,
     meals: journal.meals.map((meal) => ({ ...meal, ...byMeal.get(meal.id) })),
+    poops: journal.poops.map((entry) => ({ ...entry, photo: stoolPhotos.get(entry.id) })),
     // Built-in foods are re-seeded on boot; a backup only needs the family's own foods.
     foods: journal.foods.filter((food) => food.isCustom),
   }

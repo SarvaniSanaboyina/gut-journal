@@ -121,7 +121,56 @@ export interface PoopEntry {
   straining: boolean
   pain: boolean
   mucus: boolean
+  visibleBlood: boolean
+  hasPhoto: boolean
   notes: string
+}
+
+export type SymptomType =
+  | 'bloating'
+  | 'gas'
+  | 'stomach-pain'
+  | 'constipation'
+  | 'loose-stools'
+  | 'diarrhoea'
+  | 'vomiting'
+  | 'acid-reflux'
+  | 'other'
+
+export type Severity = 'mild' | 'moderate' | 'severe'
+
+export interface ReactionEntry {
+  id: string
+  foodId: string | null
+  mealId: string | null
+  foodName: string
+  consumedDate: string
+  consumedTime: string
+  severity: Severity
+  previousSimilar: 'yes' | 'no' | 'unsure'
+  notes: string
+}
+
+export interface SymptomEntry {
+  id: string
+  date: string
+  time: string
+  type: SymptomType
+  otherLabel: string
+  severity: Severity
+  durationMinutes: number | null
+  notes: string
+  reactions: ReactionEntry[]
+}
+
+export type Level = '' | 'low' | 'normal' | 'high'
+
+export interface DailyMetricEntry {
+  date: string
+  appetite: Level
+  energy: Level
+  sleepHours: number | null
+  digestionNotes: string
 }
 
 export type MoodKind =
@@ -159,6 +208,8 @@ export interface JournalData {
   waters: WaterEntry[]
   dayNotes: Record<string, string>
   foods: FoodEntry[]
+  symptoms: SymptomEntry[]
+  dailyMetrics: DailyMetricEntry[]
 }
 
 export const emptyJournal = (): JournalData => ({
@@ -168,4 +219,6 @@ export const emptyJournal = (): JournalData => ({
   waters: [],
   dayNotes: {},
   foods: [],
+  symptoms: [],
+  dailyMetrics: [],
 })

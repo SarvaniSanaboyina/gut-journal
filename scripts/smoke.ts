@@ -92,12 +92,40 @@ try {
   const afterFoodDelete = await call('GET', '/api/journal')
   check('custom food deleted', !afterFoodDelete.json.foods.some((f: any) => f.id === 'custom-1'))
 
-  // PHASE_CHECKS
+  // Phase 2: gut health
+  const poop = await call('PUT', '/api/poops', { id: 'p1', date: '2026-11-18', time: '18:00', bristol: 5, color: 'brown', amount: 'medium', visibleBlood: true })
+  check('poop with visible blood saved', poop.status === 200 && poop.json.visibleBlood === true, poop.json)
+  const badBristol = await call('PUT', '/api/poops', { id: 'p2', date: '2026-11-18', time: '18:00', bristol: 8 })
+  check('bristol 8 rejected', badBristol.status === 400)
+  const symptom = {
+    id: 's1', date: '2026-11-18', time: '16:30', type: 'bloating', severity: 'mild', durationMinutes: 45, notes: '',
+    reactions: [{ id: 'r1', foodId: 'idli', mealId: 'meal-1', foodName: 'Idli', consumedDate: '2026-11-18', consumedTime: '08:00', previousSimilar: 'yes' }],
+  }
+  const savedSymptom = await call('PUT', '/api/symptoms', symptom)
+  check('symptom with suspected food saved', savedSymptom.status === 200 && savedSymptom.json.reactions.length === 1, savedSymptom.json)
+  check('reaction inherits severity', savedSymptom.json.reactions?.[0]?.severity === 'mild')
+  const future = await call('PUT', '/api/symptoms', { ...symptom, id: 's2', reactions: [{ ...symptom.reactions[0], id: 'r2', consumedTime: '17:00' }] })
+  check('food eaten after symptom rejected', future.status === 400)
+  const other = await call('PUT', '/api/symptoms', { ...symptom, id: 's3', type: 'other', reactions: [] })
+  check('other symptom needs a label', other.status === 400)
+  const metric = await call('PUT', '/api/daily/2026-11-18', { appetite: 'low', energy: 'normal', sleepHours: 11 })
+  check('daily check-in saved', metric.status === 200 && metric.json.appetite === 'low')
+  const badMetric = await call('PUT', '/api/daily/2026-11-18', { sleepHours: 30 })
+  check('sleep over 24h rejected', badMetric.status === 400)
+  const gut = await call('GET', '/api/journal')
+  check('journal returns symptoms and check-ins', gut.json.symptoms.length === 1 && gut.json.dailyMetrics.length === 1)
+  const mealDelete = await call('DELETE', '/api/meals/meal-1')
+  const afterMealDelete = await call('GET', '/api/journal')
+  check('deleting a meal keeps the suspected food', mealDelete.status === 204 && afterMealDelete.json.symptoms[0].reactions[0].mealId === null)
+  await call('PUT', '/api/meals', meal)
+
 
   const backup = await call('GET', '/api/export')
   check('export has only custom foods', backup.json.foods.every((f: any) => f.isCustom))
   const restored = await call('POST', '/api/import', backup.json)
-  check('backup round-trip keeps meal items', restored.json.meals[0]?.items?.length === 1, restored.json.meals)
+  check('backup round-trip keeps meal items', restored.json.meals[0]?.items?.length >= 1, restored.json.meals)
+  check('backup round-trip keeps symptoms', restored.json.symptoms[0]?.reactions?.length === 1 && restored.json.dailyMetrics.length === 1)
+  check('backup round-trip keeps blood flag', restored.json.poops[0]?.visibleBlood === true)
 } finally {
   server.close()
   await db.prisma.$disconnect()

@@ -1,6 +1,6 @@
-import type { FoodEntry, JournalData, MealEntry, MoodEntry, PoopEntry, WaterEntry } from './types'
+import type { DailyMetricEntry, FoodEntry, JournalData, MealEntry, MoodEntry, PoopEntry, SymptomEntry, WaterEntry } from './types'
 
-type PhotoSlot = 'before' | 'after'
+type PhotoSlot = 'before' | 'after' | 'stool'
 
 export class OfflineError extends Error {
   constructor() {
@@ -120,6 +120,18 @@ export async function deleteMood(id: string) {
 
 export async function deleteWater(id: string) {
   await send(`/api/waters/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export function upsertSymptom(entry: SymptomEntry) {
+  return sendJson<SymptomEntry>('/api/symptoms', putJson(entry))
+}
+
+export async function deleteSymptom(id: string) {
+  await send(`/api/symptoms/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export function putDailyMetric(entry: DailyMetricEntry) {
+  return sendJson<DailyMetricEntry>(`/api/daily/${encodeURIComponent(entry.date)}`, putJson(entry))
 }
 
 export function upsertFood(entry: FoodEntry) {

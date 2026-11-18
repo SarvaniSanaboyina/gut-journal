@@ -3,6 +3,7 @@ import {
   AuthError,
   deleteFood,
   deleteMeal,
+  deleteSymptom,
   deleteMood,
   deletePoop,
   deleteWater,
@@ -10,7 +11,9 @@ import {
   getJournal,
   importJournal,
   OfflineError,
+  putDailyMetric,
   setNote,
+  upsertSymptom as saveSymptom,
   upsertFood as saveFood,
   upsertMeal as saveMeal,
   upsertMood as saveMood,
@@ -21,7 +24,9 @@ import { attachLegacyPhotos, clearLegacyPhotos } from './legacy'
 import { migrateMealType } from './meals'
 import { notifyPhotosChanged } from './photos'
 import type {
+  DailyMetricEntry,
   FoodEntry,
+  SymptomEntry,
   JournalData,
   MealConsistency,
   MealEntry,
@@ -96,6 +101,8 @@ function normalize(raw: unknown): JournalData {
       straining: asBoolean(item.straining),
       pain: asBoolean(item.pain),
       mucus: asBoolean(item.mucus),
+      visibleBlood: asBoolean(item.visibleBlood),
+      hasPhoto: false,
       notes: asString(item.notes),
     }))
   }
@@ -191,7 +198,7 @@ export function useJournal() {
 
   const remember = useCallback((next: JournalData) => {
     notesRef.current = next.dayNotes
-    setData({ ...next, waters: next.waters ?? [] })
+    setData({ ...next, waters: next.waters ?? [], symptoms: next.symptoms ?? [], dailyMetrics: next.dailyMetrics ?? [] })
   }, [])
 
   useEffect(() => {
@@ -260,6 +267,27 @@ export function useJournal() {
     setData((prev) => ({
       ...prev,
       waters: [...(prev.waters ?? []).filter((item) => item.id !== saved.id), saved],
+    }))
+  }, [])
+
+  const upsertSymptom = useCallback(async (entry: SymptomEntry) => {
+    const saved = await saveSymptom(entry)
+    setData((prev) => ({
+      ...prev,
+      symptoms: [...prev.symptoms.filter((item) => item.id !== saved.id), saved],
+    }))
+  }, [])
+
+  const removeSymptom = useCallback(async (id: string) => {
+    await deleteSymptom(id)
+    setData((prev) => ({ ...prev, symptoms: prev.symptoms.filter((item) => item.id !== id) }))
+  }, [])
+
+  const saveDailyMetric = useCallback(async (entry: DailyMetricEntry) => {
+    const saved = await putDailyMetric(entry)
+    setData((prev) => ({
+      ...prev,
+      dailyMetrics: [...prev.dailyMetrics.filter((item) => item.date !== saved.date), saved],
     }))
   }, [])
 
@@ -363,6 +391,9 @@ export function useJournal() {
     upsertWater,
     upsertFood,
     removeFood,
+    upsertSymptom,
+    removeSymptom,
+    saveDailyMetric,
     removeMeal,
     removePoop,
     removeMood,

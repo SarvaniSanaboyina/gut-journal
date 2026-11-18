@@ -1,9 +1,12 @@
-import { moodMeta, poopConsistencyMeta, stoolColorMeta } from '../constants'
+import { moodMeta } from '../constants'
+import { bristolGroup, bristolGroupMeta } from '../gut'
+import { careNotices } from '../safety'
 import { formatTime } from '../dates'
 import { formatCalories, hasCalories, totalCalories } from '../meals'
-import type { JournalData, MealEntry, MoodEntry, PoopEntry, WaterEntry } from '../types'
+import type { JournalData, MealEntry, MoodEntry, PoopEntry, SymptomEntry, WaterEntry } from '../types'
 import { formatTotalMl, formatWater, totalWaterMl } from '../water'
-import { MoodFace, StoolArt, WaterDrop } from './Icons'
+import { CareNotices, PoopRow, SymptomRow } from './GutEntries'
+import { MoodFace, WaterDrop } from './Icons'
 import { MealCard } from './MealCard'
 
 function byTime<T extends { time: string }>(items: T[]) {
@@ -18,6 +21,9 @@ export function TodayView({
   onAddPoop,
   onAddMood,
   onAddWater,
+  onAddSymptom,
+  onCheckIn,
+  onEditSymptom,
   onEditMeal,
   onEditPoop,
   onEditMood,
@@ -32,6 +38,9 @@ export function TodayView({
   onAddPoop: () => void
   onAddMood: () => void
   onAddWater: () => void
+  onAddSymptom: () => void
+  onCheckIn: () => void
+  onEditSymptom: (entry: SymptomEntry) => void
   onEditMeal: (entry: MealEntry) => void
   onEditPoop: (entry: PoopEntry) => void
   onEditMood: (entry: MoodEntry) => void
@@ -43,14 +52,16 @@ export function TodayView({
   const poops = byTime(data.poops.filter((item) => item.date === date))
   const moods = byTime(data.moods.filter((item) => item.date === date))
   const waters = byTime((data.waters ?? []).filter((item) => item.date === date))
-  const latestMood = moods.at(-1)
+  const symptoms = byTime(data.symptoms.filter((item) => item.date === date))
+  const metric = data.dailyMetrics.find((item) => item.date === date)
+  const notices = careNotices(data, date)
   const waterTotal = totalWaterMl(waters)
   const calorieTotal = totalCalories(meals)
   const caloriesLogged = hasCalories(meals)
   const poopSummary = poops.length === 1
-    ? poopConsistencyMeta(poops[0].bristol).label
+    ? `Type ${poops[0].bristol}`
     : poops.length > 1
-      ? `${poops.length}`
+      ? `${poops.length} · ${bristolGroupMeta(bristolGroup(poops.at(-1)!.bristol)).label.split(' ')[0]}`
       : '—'
 
   return (
@@ -65,10 +76,15 @@ export function TodayView({
         <button type="button" onClick={onAddPoop}>
           <span className="qi" aria-hidden="true">🚽</span>Poop
         </button>
-        <button type="button" onClick={onAddMood}>
-          <span className="qi" aria-hidden="true">🙂</span>Mood
+        <button type="button" onClick={onAddSymptom}>
+          <span className="qi" aria-hidden="true">🩹</span>Symptom
+        </button>
+        <button type="button" onClick={onCheckIn}>
+          <span className="qi" aria-hidden="true">📝</span>Check-in
         </button>
       </div>
+
+      <CareNotices notices={notices} />
 
       <div className="summary">
         <div className="summary-card">
@@ -84,8 +100,8 @@ export function TodayView({
           <strong>{poops.length ? poopSummary : '—'}</strong>
         </div>
         <div className="summary-card">
-          <span>Mood</span>
-          <strong>{latestMood ? moodMeta(latestMood.mood).label : '—'}</strong>
+          <span>Symptoms</span>
+          <strong>{symptoms.length || '—'}</strong>
         </div>
       </div>
 
@@ -155,8 +171,8 @@ export function TodayView({
       <section className="section">
         <div className="section-head">
           <div>
-            <h3>Poop log</h3>
-            <p>Time, consistency, color, and how it felt</p>
+            <h3>Bowel movements</h3>
+            <p>Bristol type, colour, and how it felt</p>
           </div>
           <button className="add-btn" onClick={onAddPoop}>+ Add</button>
         </div>
@@ -164,33 +180,45 @@ export function TodayView({
           <div className="empty">No poops logged today.</div>
         ) : (
           <div className="entry-list">
-            {poops.map((entry) => {
-              const meta = poopConsistencyMeta(entry.bristol)
-              const color = stoolColorMeta(entry.color)
-              return (
-                <button key={entry.id} className="entry" onClick={() => onEditPoop(entry)}>
-                  <StoolArt type={meta.bristol} />
-                  <span>
-                    <div className="title">
-                      {meta.label}
-                    </div>
-                    <div className="detail">
-                      {color.label} · {entry.amount}
-                      {entry.notes ? ` · ${entry.notes}` : ''}
-                    </div>
-                    {(entry.straining || entry.pain || entry.mucus) && (
-                      <div className="flags">
-                        {entry.straining && <span className="flag">Straining</span>}
-                        {entry.pain && <span className="flag">Pain</span>}
-                        {entry.mucus && <span className="flag">Mucus</span>}
-                      </div>
-                    )}
-                  </span>
-                  <span className="meta">{formatTime(entry.time)}</span>
-                </button>
-              )
-            })}
+            {poops.map((entry) => <PoopRow key={entry.id} entry={entry} onSelect={() => onEditPoop(entry)} />)}
           </div>
+        )}
+      </section>
+
+      <section className="section">
+        <div className="section-head">
+          <div>
+            <h3>Symptoms</h3>
+            <p>Tummy troubles, separate from meals</p>
+          </div>
+          <button className="add-btn" onClick={onAddSymptom}>+ Add</button>
+        </div>
+        {symptoms.length === 0 ? (
+          <div className="empty">No symptoms logged. Nothing to note is good news.</div>
+        ) : (
+          <div className="entry-list">
+            {symptoms.map((entry) => <SymptomRow key={entry.id} entry={entry} onSelect={() => onEditSymptom(entry)} />)}
+          </div>
+        )}
+      </section>
+
+      <section className="section">
+        <div className="section-head">
+          <div>
+            <h3>Daily check-in</h3>
+            <p>Appetite, energy, sleep and digestion</p>
+          </div>
+          <button className="add-btn" onClick={onCheckIn}>{metric ? 'Edit' : '+ Add'}</button>
+        </div>
+        {metric ? (
+          <div className="insight">
+            <div className="row"><span>Appetite</span><strong>{metric.appetite ? metric.appetite[0].toUpperCase() + metric.appetite.slice(1) : '—'}</strong></div>
+            <div className="row"><span>Energy</span><strong>{metric.energy ? metric.energy[0].toUpperCase() + metric.energy.slice(1) : '—'}</strong></div>
+            <div className="row"><span>Sleep</span><strong>{metric.sleepHours != null ? `${metric.sleepHours} h` : '—'}</strong></div>
+            {metric.digestionNotes && <div className="row"><span>Digestion</span><strong>{metric.digestionNotes}</strong></div>}
+          </div>
+        ) : (
+          <div className="empty">How was {name}'s appetite and energy today? Takes 10 seconds.</div>
         )}
       </section>
 

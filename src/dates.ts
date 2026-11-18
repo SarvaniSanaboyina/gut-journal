@@ -210,6 +210,13 @@ export function weekdayLabels(): string[] {
   )
 }
 
+/** Weekday names starting on Monday, matching `monthCellsMonday`. */
+export function weekdayLabelsMonday(): string[] {
+  return Array.from({ length: 7 }, (_, index) =>
+    new Date(2026, 1, index + 2).toLocaleDateString(undefined, { weekday: 'short' }),
+  )
+}
+
 export function formatMonthYear(year: number, month: number): string {
   return new Date(year, month, 1).toLocaleDateString(undefined, {
     month: 'long',

@@ -15,7 +15,7 @@ import {
   shiftDateByMonth,
   todayISO,
   weekDates,
-  weekdayLabels,
+  weekdayLabelsMonday,
 } from '../dates'
 import {
   buildMonthlyReport,
@@ -56,7 +56,7 @@ export function ReportsView({
     () => monthCellsMonday(month.getFullYear(), month.getMonth()),
     [month],
   )
-  const weekdays = useMemo(() => weekdayLabels(), [])
+  const weekdays = useMemo(() => weekdayLabelsMonday(), [])
   const atCurrentWeek = mondayOf(date) >= mondayOf(today)
   const atCurrentMonth = monthStart(date) >= monthStart(today)
   const incomplete =

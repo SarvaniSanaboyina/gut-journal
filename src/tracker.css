@@ -412,3 +412,262 @@ select {
   .stepper { grid-template-columns: 44px minmax(48px, 1fr) 44px; }
   .label-grid { grid-template-columns: 1fr 1fr; }
 }
+
+/* Gut health */
+.alert.urgent {
+  background: #fde2e2;
+  color: #8a2a2a;
+  border: 1px solid #f3b9b9;
+  font-weight: 600;
+}
+
+.bristol-scale {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.bristol-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.bristol-group-head i,
+.legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.bristol-group-head small {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.bristol-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.bristol-option {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  font-size: 0.88rem;
+  min-height: 52px;
+}
+
+.bristol-option .stool-art {
+  justify-content: center;
+}
+
+.photo-slots.single {
+  grid-template-columns: minmax(0, 220px);
+}
+
+.choice-grid.symptoms {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.choice.severity-severe.selected {
+  border-color: #c45b5b;
+  background: #fde2e2;
+  box-shadow: inset 0 0 0 1px #c45b5b;
+}
+
+.choice-row.compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 6px;
+}
+
+.suspect-box {
+  border: 1px dashed var(--line);
+  border-radius: 16px;
+  padding: 6px 12px 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.suspect-meal {
+  display: grid;
+  gap: 6px;
+}
+
+.suspect-meal-head {
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.suspect-meal-head small {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.suspect-row {
+  background: var(--cream);
+  border-radius: 12px;
+  padding: 10px;
+  font-size: 0.86rem;
+}
+
+.group-pill,
+.severity-pill {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  vertical-align: 2px;
+}
+
+.severity-pill { text-transform: capitalize; }
+
+.severity-pill.mild { background: #e8f2e5; color: #3f6b36; }
+.severity-pill.moderate { background: #fff1d6; color: #8a5a00; }
+.severity-pill.severe { background: #fde2e2; color: #8a2a2a; }
+
+.flag.urgent { background: #fde2e2; color: #8a2a2a; }
+.flag.suspect { background: var(--wash-sky); color: #3f6f96; }
+
+.symptom-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+  width: 28px;
+  text-align: center;
+}
+
+.care-notices {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.care-notice {
+  border-radius: 16px;
+  padding: 12px 14px;
+  border: 1px solid;
+}
+
+.care-notice strong { display: block; margin-bottom: 2px; }
+.care-notice p { margin: 0; font-size: 0.88rem; line-height: 1.45; }
+.care-notice.urgent { background: #fdecec; border-color: #f0b8b8; color: #7a2424; }
+.care-notice.discuss { background: #fff6e3; border-color: #f1d9a3; color: #6e4c0b; }
+
+.segmented {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 4px;
+  background: var(--paper-deep);
+  border-radius: 999px;
+  padding: 4px;
+  margin-bottom: 14px;
+}
+
+.segmented button {
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 9px 6px;
+  font-weight: 650;
+  font-size: 0.88rem;
+  min-height: 40px;
+}
+
+.segmented button.active {
+  background: var(--card);
+  box-shadow: 0 2px 8px rgba(58, 45, 82, 0.12);
+}
+
+.quick-log.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.bowel-day {
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bowel-dots {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  height: 8px;
+}
+
+.bowel-dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.bowel-dots b {
+  font-size: 0.6rem;
+  line-height: 1;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 12px;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+.legend span {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.filter-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.disclaimer {
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 12px 2px 0;
+}
+
+.reaction-table {
+  display: grid;
+  gap: 6px;
+}
+
+.reaction-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: var(--card);
+  text-align: left;
+  width: 100%;
+}
+
+.reaction-row small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+@media (max-width: 640px) {
+  .bristol-options { grid-template-columns: 1fr; }
+  .choice-grid.symptoms { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .reaction-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .reaction-row > :last-child { grid-column: 1 / -1; }
+  .segmented button { font-size: 0.8rem; }
+}
