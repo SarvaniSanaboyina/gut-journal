@@ -88,9 +88,21 @@ function AssessmentForm({ value, onSave, onClose }: { value: AssessmentConfig; o
 }
 
 function CalendarLegend({ config, onSaveAssessment }: { config: AssessmentConfig; onSaveAssessment: (value: NutritionAssessmentSettings) => Promise<void> }) {
+  const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(false)
+  // Hidden by default to keep the calendar uncluttered; one tap shows what the colours mean.
+  if (!open) {
+    return (
+      <button type="button" className="link-btn cal-legend-toggle" aria-expanded="false" onClick={() => setOpen(true)}>
+        Show colour key
+      </button>
+    )
+  }
   return (
     <div className="cal-legend" aria-label="Calendar legend">
+      <button type="button" className="link-btn cal-legend-toggle" aria-expanded="true" onClick={() => { setOpen(false); setEditing(false) }}>
+        Hide colour key
+      </button>
       <ul>
         {CALENDAR_LEGEND_ORDER.map((state) => (
           <li key={state}>
