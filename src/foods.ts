@@ -21,11 +21,11 @@ export const FOOD_CATEGORIES: { id: FoodCategory; label: string; icon: string; g
 ]
 
 export const FOOD_GROUPS: { id: FoodGroup; label: string; short: string; color: string }[] = [
-  { id: 'carbohydrate', label: 'Carbohydrates', short: 'Carbs', color: '#d9a441' },
-  { id: 'protein', label: 'Protein', short: 'Protein', color: '#c4607e' },
-  { id: 'vegetable', label: 'Vegetables', short: 'Veg', color: '#5f9e6e' },
-  { id: 'fruit', label: 'Fruits', short: 'Fruit', color: '#e07a3f' },
-  { id: 'fat', label: 'Healthy fats', short: 'Fats', color: '#7b5cb0' },
+  { id: 'carbohydrate', label: 'Carbohydrates', short: 'Carbs', color: '#2a78d6' },
+  { id: 'protein', label: 'Protein', short: 'Protein', color: '#eb6834' },
+  { id: 'vegetable', label: 'Vegetables', short: 'Veg', color: '#1baf7a' },
+  { id: 'fruit', label: 'Fruits', short: 'Fruit', color: '#eda100' },
+  { id: 'fat', label: 'Healthy fats', short: 'Fats', color: '#e87ba4' },
 ]
 
 export const FOOD_UNITS: { id: FoodUnit; label: string; singular: string }[] = [

@@ -10,6 +10,7 @@ import {
   readGut,
   type SymptomEntry,
 } from './gut.ts'
+import { importSettings, readSettings, type Settings } from './settings.ts'
 import {
   bad,
   type Db,
@@ -125,6 +126,7 @@ export type JournalData = {
   foods: FoodEntry[]
   symptoms: SymptomEntry[]
   dailyMetrics: DailyMetricEntry[]
+  settings: Settings
 }
 
 const MAX_ENTRIES = 10000
@@ -540,6 +542,7 @@ export async function readJournal(db: PrismaClient): Promise<JournalData> {
   ])
   const foods = await listFoods(db)
   const gut = await readGut(db)
+  const settings = await readSettings(db)
   const dayNotes: Record<string, string> = {}
   for (const row of notes) dayNotes[row.date] = row.note
   return {
@@ -550,6 +553,7 @@ export async function readJournal(db: PrismaClient): Promise<JournalData> {
     dayNotes,
     foods,
     ...gut,
+    settings,
   }
 }
 
@@ -762,6 +766,7 @@ export async function importJournal(db: PrismaClient, body: unknown): Promise<Jo
     for (const entry of poops) await insertPoop(tx, entry)
     for (const entry of symptoms) await insertSymptom(tx, entry)
     for (const entry of metrics) await insertMetric(tx, entry)
+    if (isRecord(body.settings)) await importSettings(tx, body.settings)
     for (const entry of moods) await insertMood(tx, entry)
     for (const entry of waters) await insertWater(tx, entry)
     for (const [date, note] of Object.entries(dayNotes)) {

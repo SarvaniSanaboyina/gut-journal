@@ -7,6 +7,7 @@ import { Chevron } from './components/Icons'
 import { CheckInForm } from './components/CheckInForm'
 import { FoodsManager } from './components/FoodsManager'
 import { GutView } from './components/GutView'
+import { NutritionView } from './components/NutritionView'
 import { SymptomForm } from './components/SymptomForm'
 import { MealForm } from './components/MealForm'
 import { Modal } from './components/Modal'
@@ -21,7 +22,7 @@ import { formatLongDate, isToday, shiftDate, todayISO } from './dates'
 import { useJournal } from './storage'
 import type { MealEntry, MoodEntry, PoopEntry, SymptomEntry, WaterEntry } from './types'
 
-type View = 'today' | 'gut' | 'reports' | 'history'
+type View = 'today' | 'gut' | 'nutrition' | 'reports' | 'history'
 type Editor =
   | { kind: 'meal'; entry?: MealEntry }
   | { kind: 'poop'; entry?: PoopEntry }
@@ -111,7 +112,10 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
           </div>
         </div>
         <AccountMenu
-          items={[{ label: 'Food list', onSelect: () => setFoodsOpen(true) }]}
+          items={[
+            { label: 'History & backup', onSelect: () => setView('history') },
+            { label: 'Food list', onSelect: () => setFoodsOpen(true) },
+          ]}
           onChangeBirthDate={() => setBirthDateOpen(true)}
           onSignOut={() => void onSignOut()}
         />
@@ -199,6 +203,16 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
         />
       )}
 
+      {journal.status === 'ready' && view === 'nutrition' && (
+        <NutritionView
+          data={journal.data}
+          date={date}
+          onChangeDate={setDate}
+          onSaveProfile={journal.saveChildProfile}
+          onSaveReferences={journal.saveReferences}
+        />
+      )}
+
       {journal.status === 'ready' && view === 'reports' && (
         <ReportsView
           date={date}
@@ -230,11 +244,11 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
         <button className={view === 'gut' ? 'active' : ''} onClick={() => setView('gut')}>
           Gut
         </button>
+        <button className={view === 'nutrition' ? 'active' : ''} onClick={() => setView('nutrition')}>
+          Nutrition
+        </button>
         <button className={view === 'reports' ? 'active' : ''} onClick={() => setView('reports')}>
           Reports
-        </button>
-        <button className={view === 'history' ? 'active' : ''} onClick={() => setView('history')}>
-          History
         </button>
       </nav>
 

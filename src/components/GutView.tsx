@@ -4,6 +4,7 @@ import {
   formatLongDate,
   formatMonthYear,
   formatShortDate,
+  formatWeekday,
   monthCellsMonday,
   parseISODate,
   shiftDate,
@@ -11,16 +12,170 @@ import {
   todayISO,
   weekdayLabelsMonday,
 } from '../dates'
-import { associationSentence, BRISTOL_GROUPS, bristolGroup, findAssociations, formatGap, poopsByDay, stamp, SYMPTOMS, symptomLabel } from '../gut'
+import {
+  associationSentence,
+  BRISTOL_GROUPS,
+  BRISTOL_TYPES,
+  bristolGroup,
+  bristolGroupMeta,
+  findAssociations,
+  formatGap,
+  gutObservations,
+  gutStats,
+  poopsByDay,
+  stamp,
+  SYMPTOMS,
+  symptomLabel,
+} from '../gut'
 import { careNotices, DISCLAIMER } from '../safety'
 import type { JournalData, PoopEntry, SymptomEntry, SymptomType } from '../types'
+import { BarList, ColumnChart } from './Charts'
 import { CareNotices, PoopRow, SymptomRow } from './GutEntries'
 import { Chevron } from './Icons'
 
-type Tab = 'bowel' | 'symptoms' | 'links'
+type Tab = 'overview' | 'bowel' | 'symptoms' | 'links'
+type Span = 'day' | 'week' | 'month' | 'custom'
 
 function byNewest<T extends { date: string; time: string }>(items: T[]) {
   return [...items].sort((a, b) => `${b.date}T${b.time}`.localeCompare(`${a.date}T${a.time}`))
+}
+
+function Overview({ data, onEdit }: { data: JournalData; onEdit: (entry: SymptomEntry) => void }) {
+  const today = todayISO()
+  const [span, setSpan] = useState<Span>('week')
+  const [start, setStart] = useState(shiftDate(today, -13))
+  const [end, setEnd] = useState(today)
+  const [filter, setFilter] = useState<SymptomType | 'all'>('all')
+  const days = useMemo(() => {
+    if (span === 'day') return [end]
+    if (span === 'week') return dateRange(shiftDate(end, -6), end)
+    if (span === 'month') return dateRange(shiftDate(end, -29), end)
+    return start <= end ? dateRange(start, end) : []
+  }, [span, start, end])
+  const previousDays = useMemo(() => days.map((day) => shiftDate(day, -days.length)), [days])
+  const stats = useMemo(() => gutStats(data, days, filter), [data, days, filter])
+  const previous = useMemo(() => (span === 'day' ? null : gutStats(data, previousDays, filter)), [data, previousDays, filter, span])
+  const observations = useMemo(() => gutObservations(stats, previous), [stats, previous])
+  const symptomCounts = SYMPTOMS.map((item) => ({ ...item, count: stats.symptoms.filter((symptom) => symptom.type === item.id).length })).filter((item) => item.count > 0)
+  const reactions = stats.symptoms.flatMap((symptom) => symptom.reactions.map((reaction) => ({ symptom, reaction })))
+  const long = days.length > 14
+
+  return (
+    <>
+      <div className="filter-row">
+        <label className="field">
+          <span>Period</span>
+          <select value={span} onChange={(event) => setSpan(event.target.value as Span)}>
+            <option value="day">One day</option>
+            <option value="week">7 days</option>
+            <option value="month">30 days</option>
+            <option value="custom">Custom range</option>
+          </select>
+        </label>
+        {span === 'custom' && (
+          <label className="field">
+            <span>From</span>
+            <input type="date" value={start} max={end} onChange={(event) => setStart(event.target.value)} />
+          </label>
+        )}
+        <label className="field">
+          <span>{span === 'custom' ? 'To' : span === 'day' ? 'Day' : 'Ending'}</span>
+          <input type="date" value={end} max={today} onChange={(event) => setEnd(event.target.value || today)} />
+        </label>
+        <label className="field">
+          <span>Symptom</span>
+          <select value={filter} onChange={(event) => setFilter(event.target.value as SymptomType | 'all')}>
+            <option value="all">All symptoms</option>
+            {SYMPTOMS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+          </select>
+        </label>
+      </div>
+
+      <div className="stat-tiles">
+        <div className="stat-tile"><span>Bowel movements</span><strong>{stats.poops.length}</strong></div>
+        <div className="stat-tile"><span>Per day</span><strong>{stats.poops.length ? Math.round(stats.perDay * 10) / 10 : '—'}</strong></div>
+        <div className="stat-tile"><span>Symptoms</span><strong>{stats.symptoms.length}</strong></div>
+        <div className="stat-tile"><span>Suspected foods</span><strong>{reactions.length}</strong></div>
+      </div>
+
+      <section className="section">
+        <div className="section-head">
+          <div>
+            <h3>What the log shows</h3>
+            <p>{span === 'day' ? formatLongDate(end) : `${formatShortDate(days[0] ?? end)} – ${formatShortDate(end)}${previous ? ', compared with the period before' : ''}`}</p>
+          </div>
+        </div>
+        <ul className="observations">{observations.map((item) => <li key={item}>{item}</li>)}</ul>
+      </section>
+
+      {span !== 'day' && days.length > 1 && (
+        <section className="section">
+          <ColumnChart
+            title="Bowel movements per day"
+            subtitle="Coloured by stool type group"
+            series={BRISTOL_GROUPS.map((group) => ({ id: group.id, label: group.label, color: group.color }))}
+            columns={days.map((day, index) => ({
+              key: day,
+              label: long ? (index % 5 === 0 || index === days.length - 1 ? String(Number(day.slice(8))) : '') : formatWeekday(day),
+              full: formatLongDate(day),
+              values: Object.fromEntries(BRISTOL_GROUPS.map((group) => [group.id, stats.poops.filter((poop) => poop.date === day && bristolGroup(poop.bristol) === group.id).length])),
+            }))}
+          />
+        </section>
+      )}
+
+      <section className="section">
+        <BarList
+          title="Stool type distribution"
+          subtitle="Bristol stool scale, types 1–7"
+          rows={BRISTOL_TYPES.map((item) => {
+            const group = bristolGroupMeta(item.group)
+            return { key: String(item.type), label: <>Type {item.type} <small>{item.hint}</small></>, text: `Type ${item.type} (${item.hint})`, value: stats.byType[item.type], color: group.color }
+          })}
+        />
+      </section>
+
+      <section className="section">
+        {symptomCounts.length === 0 ? (
+          <>
+            <div className="section-head"><div><h3>Symptom frequency</h3></div></div>
+            <div className="empty">No {filter === 'all' ? '' : `${symptomLabel({ type: filter, otherLabel: '' }).toLowerCase()} `}symptoms recorded in this period.</div>
+          </>
+        ) : (
+          <BarList
+            title="Symptom frequency"
+            subtitle={filter === 'all' ? 'All symptom types' : `Filtered to ${symptomLabel({ type: filter, otherLabel: '' }).toLowerCase()}`}
+            rows={symptomCounts.map((item) => ({
+              key: item.id,
+              label: <>{item.icon} {item.label}</>,
+              text: item.label,
+              value: item.count,
+              color: '#7b5cb0',
+              note: (() => {
+                const severe = stats.symptoms.filter((symptom) => symptom.type === item.id && symptom.severity === 'severe').length
+                return severe ? ` · ${severe} severe` : ''
+              })(),
+            }))}
+          />
+        )}
+      </section>
+
+      {reactions.length > 0 && (
+        <section className="section">
+          <div className="section-head"><div><h3>Food reactions in this period</h3><p>Foods marked as suspected — possible links only</p></div></div>
+          <div className="reaction-table">
+            {reactions.map(({ symptom, reaction }) => (
+              <button key={reaction.id} type="button" className="reaction-row" onClick={() => onEdit(symptom)}>
+                <span><strong>{reaction.foodName}</strong><small>eaten {formatShortDate(reaction.consumedDate)}</small></span>
+                <span>{symptomLabel(symptom)}<small>{formatGap((stamp(symptom.date, symptom.time) - stamp(reaction.consumedDate, reaction.consumedTime)) / 60000)} later</small></span>
+                <span className={`severity-pill ${reaction.severity}`}>{reaction.severity}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+    </>
+  )
 }
 
 function BowelCalendar({
@@ -269,7 +424,7 @@ export function GutView({
   onAddPoop: () => void
   onAddSymptom: () => void
 }) {
-  const [tab, setTab] = useState<Tab>('bowel')
+  const [tab, setTab] = useState<Tab>('overview')
   const notices = useMemo(() => careNotices(data, todayISO()), [data])
 
   return (
@@ -281,7 +436,8 @@ export function GutView({
       <CareNotices notices={notices} />
       <div className="segmented" role="tablist" aria-label="Gut health sections">
         {([
-          ['bowel', 'Bowel movements'],
+          ['overview', 'Overview'],
+          ['bowel', 'Bowel log'],
           ['symptoms', 'Symptoms'],
           ['links', 'Food links'],
         ] as const).map(([id, label]) => (
@@ -290,6 +446,7 @@ export function GutView({
           </button>
         ))}
       </div>
+      {tab === 'overview' && <Overview data={data} onEdit={onEditSymptom} />}
       {tab === 'bowel' && <BowelCalendar poops={data.poops} onEdit={onEditPoop} />}
       {tab === 'symptoms' && <SymptomList symptoms={data.symptoms} onEdit={onEditSymptom} />}
       {tab === 'links' && <FoodLinks data={data} onEdit={onEditSymptom} />}

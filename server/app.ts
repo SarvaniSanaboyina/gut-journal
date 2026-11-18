@@ -33,6 +33,7 @@ import {
 } from './journal.ts'
 import { removeCustomFood, saveCustomFood } from './foods.ts'
 import { removeSymptom, saveMetric, saveSymptom } from './gut.ts'
+import { saveSetting } from './settings.ts'
 
 const JSON_LIMIT = '32mb'
 const PHOTO_LIMIT = '8mb'
@@ -221,6 +222,10 @@ export function createApp(prisma: PrismaClient, options: { distDir?: string } = 
 
   app.put('/api/daily/:date', async (req, res) => {
     res.json(await saveMetric(prisma, param(req.params.date), req.body))
+  })
+
+  app.put('/api/settings/:key', async (req, res) => {
+    res.json(await saveSetting(prisma, param(req.params.key), req.body))
   })
 
   app.put('/api/foods', async (req, res) => {

@@ -210,6 +210,17 @@ export interface JournalData {
   foods: FoodEntry[]
   symptoms: SymptomEntry[]
   dailyMetrics: DailyMetricEntry[]
+  settings: Settings
+}
+
+export interface ChildProfile {
+  sex: '' | 'female' | 'male'
+  birthDate: string
+}
+
+export interface Settings {
+  childProfile: ChildProfile
+  nutrientReferences: { custom: Partial<Record<NutrientKey, number>> }
 }
 
 export const emptyJournal = (): JournalData => ({
@@ -221,4 +232,5 @@ export const emptyJournal = (): JournalData => ({
   foods: [],
   symptoms: [],
   dailyMetrics: [],
+  settings: { childProfile: { sex: '', birthDate: '' }, nutrientReferences: { custom: {} } },
 })

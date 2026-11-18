@@ -134,6 +134,10 @@ export function putDailyMetric(entry: DailyMetricEntry) {
   return sendJson<DailyMetricEntry>(`/api/daily/${encodeURIComponent(entry.date)}`, putJson(entry))
 }
 
+export function putSetting<T>(key: 'child-profile' | 'nutrient-references', value: T) {
+  return sendJson<T>(`/api/settings/${key}`, putJson(value))
+}
+
 export function upsertFood(entry: FoodEntry) {
   return sendJson<FoodEntry>('/api/foods', putJson(entry))
 }

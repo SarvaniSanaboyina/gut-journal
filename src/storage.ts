@@ -12,6 +12,7 @@ import {
   importJournal,
   OfflineError,
   putDailyMetric,
+  putSetting,
   setNote,
   upsertSymptom as saveSymptom,
   upsertFood as saveFood,
@@ -24,7 +25,9 @@ import { attachLegacyPhotos, clearLegacyPhotos } from './legacy'
 import { migrateMealType } from './meals'
 import { notifyPhotosChanged } from './photos'
 import type {
+  ChildProfile,
   DailyMetricEntry,
+  Settings,
   FoodEntry,
   SymptomEntry,
   JournalData,
@@ -198,7 +201,7 @@ export function useJournal() {
 
   const remember = useCallback((next: JournalData) => {
     notesRef.current = next.dayNotes
-    setData({ ...next, waters: next.waters ?? [], symptoms: next.symptoms ?? [], dailyMetrics: next.dailyMetrics ?? [] })
+    setData({ ...next, waters: next.waters ?? [], symptoms: next.symptoms ?? [], dailyMetrics: next.dailyMetrics ?? [], settings: next.settings ?? emptyJournal().settings })
   }, [])
 
   useEffect(() => {
@@ -289,6 +292,16 @@ export function useJournal() {
       ...prev,
       dailyMetrics: [...prev.dailyMetrics.filter((item) => item.date !== saved.date), saved],
     }))
+  }, [])
+
+  const saveChildProfile = useCallback(async (profile: ChildProfile) => {
+    const saved = await putSetting('child-profile', profile)
+    setData((prev) => ({ ...prev, settings: { ...prev.settings, childProfile: saved } }))
+  }, [])
+
+  const saveReferences = useCallback(async (references: Settings['nutrientReferences']) => {
+    const saved = await putSetting('nutrient-references', references)
+    setData((prev) => ({ ...prev, settings: { ...prev.settings, nutrientReferences: saved } }))
   }, [])
 
   const upsertFood = useCallback(async (entry: FoodEntry) => {
@@ -394,6 +407,8 @@ export function useJournal() {
     upsertSymptom,
     removeSymptom,
     saveDailyMetric,
+    saveChildProfile,
+    saveReferences,
     removeMeal,
     removePoop,
     removeMood,

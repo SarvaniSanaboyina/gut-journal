@@ -15,10 +15,10 @@ export const BRISTOL_TYPES: { type: BristolType; label: string; hint: string; gr
 export type BristolGroup = 'hard' | 'formed' | 'soft' | 'loose'
 
 export const BRISTOL_GROUPS: { id: BristolGroup; label: string; range: string; color: string }[] = [
-  { id: 'hard', label: 'Hard stools', range: 'Types 1–2', color: '#8b5a2b' },
-  { id: 'formed', label: 'Formed stools', range: 'Types 3–4', color: '#5f9e6e' },
-  { id: 'soft', label: 'Soft pieces', range: 'Type 5', color: '#d9a441' },
-  { id: 'loose', label: 'Loose or watery', range: 'Types 6–7', color: '#6b9ad8' },
+  { id: 'hard', label: 'Hard stools', range: 'Types 1–2', color: '#eb6834' },
+  { id: 'formed', label: 'Formed stools', range: 'Types 3–4', color: '#1baf7a' },
+  { id: 'soft', label: 'Soft pieces', range: 'Type 5', color: '#eda100' },
+  { id: 'loose', label: 'Loose or watery', range: 'Types 6–7', color: '#2a78d6' },
 ]
 
 export function bristolMeta(type: BristolType) {
@@ -188,4 +188,111 @@ export function poopsByDay(poops: PoopEntry[]) {
   const map = new Map<string, PoopEntry[]>()
   for (const poop of poops) map.set(poop.date, [...(map.get(poop.date) ?? []), poop])
   return map
+}
+
+export type GutStats = {
+  days: string[]
+  /** Days with at least one entry of any kind; days with nothing logged are unknown, not "no poop". */
+  trackedDays: string[]
+  poops: PoopEntry[]
+  symptoms: SymptomEntry[]
+  perDay: number
+  daysWithout: number
+  longestGap: number
+  byType: Record<number, number>
+  byGroup: Record<BristolGroup, number>
+  strainOrPain: number
+}
+
+export function gutStats(data: JournalData, days: string[], symptomFilter: SymptomType | 'all' = 'all'): GutStats {
+  const set = new Set(days)
+  const poops = data.poops.filter((item) => set.has(item.date))
+  const symptoms = data.symptoms.filter((item) => set.has(item.date) && (symptomFilter === 'all' || item.type === symptomFilter))
+  const byType: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 }
+  const byGroup: Record<BristolGroup, number> = { hard: 0, formed: 0, soft: 0, loose: 0 }
+  for (const poop of poops) {
+    byType[poop.bristol] += 1
+    byGroup[bristolGroup(poop.bristol)] += 1
+  }
+  const withPoop = new Set(poops.map((item) => item.date))
+  const logged = new Set([
+    ...data.meals.map((item) => item.date),
+    ...data.poops.map((item) => item.date),
+    ...data.symptoms.map((item) => item.date),
+    ...data.waters.map((item) => item.date),
+    ...data.dailyMetrics.map((item) => item.date),
+  ])
+  const trackedDays = days.filter((day) => logged.has(day))
+  let gap = 0
+  let longestGap = 0
+  for (const day of days) {
+    if (!logged.has(day)) {
+      gap = 0
+      continue
+    }
+    gap = withPoop.has(day) ? 0 : gap + 1
+    longestGap = Math.max(longestGap, gap)
+  }
+  return {
+    days,
+    trackedDays,
+    poops,
+    symptoms,
+    perDay: trackedDays.length ? poops.length / trackedDays.length : 0,
+    daysWithout: trackedDays.filter((day) => !withPoop.has(day)).length,
+    longestGap,
+    byType,
+    byGroup,
+    strainOrPain: poops.filter((item) => item.straining || item.pain).length,
+  }
+}
+
+function share(part: number, total: number) {
+  return total ? Math.round((part / total) * 100) : 0
+}
+
+/**
+ * Plain-language patterns. Nothing is said about stool consistency until there are at
+ * least `MIN_ENTRIES` bowel movements, so isolated entries never drive a conclusion.
+ */
+export function gutObservations(current: GutStats, previous: GutStats | null): string[] {
+  const MIN_ENTRIES = 4
+  const out: string[] = []
+  const total = current.poops.length
+  if (total < MIN_ENTRIES) {
+    out.push(`${total} bowel movement${total === 1 ? '' : 's'} logged in this period — patterns are shown once at least ${MIN_ENTRIES} are recorded.`)
+  } else {
+    const tracked = current.trackedDays.length
+    out.push(`About ${Math.round(current.perDay * 10) / 10} bowel movements per day on average (${total} over ${tracked} day${tracked === 1 ? '' : 's'} with entries${tracked < current.days.length ? `; ${current.days.length - tracked} day${current.days.length - tracked === 1 ? '' : 's'} had nothing logged` : ''}).`)
+    const hard = share(current.byGroup.hard, total)
+    const loose = share(current.byGroup.loose, total)
+    const formed = share(current.byGroup.formed + current.byGroup.soft, total)
+    out.push(`${formed}% were formed or soft (types 3–5).`)
+    if (hard >= 25 || current.strainOrPain >= 3 || current.longestGap >= 3) {
+      const parts = [
+        hard >= 25 ? `${hard}% were hard (types 1–2)` : '',
+        current.strainOrPain >= 3 ? `straining or pain was noted ${current.strainOrPain} times` : '',
+        current.longestGap >= 3 ? `there were ${current.longestGap} days in a row with other entries but no bowel movement logged` : '',
+      ].filter(Boolean)
+      out.push(`Constipation-type pattern to keep an eye on: ${parts.join('; ')}.`)
+    }
+    if (loose >= 25) out.push(`Loose-stool pattern to keep an eye on: ${loose}% were loose or watery (types 6–7).`)
+  }
+  if (previous && previous.poops.length >= MIN_ENTRIES && total >= MIN_ENTRIES) {
+    const diff = current.perDay - previous.perDay
+    if (Math.abs(diff) >= 0.3) out.push(`Bowel movements were ${diff > 0 ? 'more' : 'less'} frequent than the previous period (${Math.round(previous.perDay * 10) / 10} per day before).`)
+    const hardBefore = share(previous.byGroup.hard, previous.poops.length)
+    const hardNow = share(current.byGroup.hard, total)
+    if (Math.abs(hardNow - hardBefore) >= 20) out.push(`Hard stools ${hardNow > hardBefore ? 'increased' : 'decreased'} compared with the previous period (${hardBefore}% → ${hardNow}%).`)
+    const looseBefore = share(previous.byGroup.loose, previous.poops.length)
+    const looseNow = share(current.byGroup.loose, total)
+    if (Math.abs(looseNow - looseBefore) >= 20) out.push(`Loose stools ${looseNow > looseBefore ? 'increased' : 'decreased'} compared with the previous period (${looseBefore}% → ${looseNow}%).`)
+  }
+  if (current.symptoms.length) {
+    const counts = new Map<string, number>()
+    for (const symptom of current.symptoms) counts.set(symptomLabel(symptom), (counts.get(symptomLabel(symptom)) ?? 0) + 1)
+    const top = [...counts.entries()].sort((a, b) => b[1] - a[1])
+    out.push(`Symptoms recorded: ${top.map(([name, count]) => `${name.toLowerCase()} ${count}×`).join(', ')}.`)
+  }
+  return out
 }

@@ -120,11 +120,22 @@ try {
   await call('PUT', '/api/meals', meal)
 
 
+  // Phase 3: settings
+  const profile = await call('PUT', '/api/settings/child-profile', { sex: 'female', birthDate: '2023-05-04' })
+  check('child profile saved', profile.status === 200 && profile.json.sex === 'female')
+  const badSex = await call('PUT', '/api/settings/child-profile', { sex: 'x' })
+  check('invalid sex rejected', badSex.status === 400)
+  const refs = await call('PUT', '/api/settings/nutrient-references', { custom: { ironMg: 9, bogus: 3 } })
+  check('custom reference saved, unknown keys dropped', refs.json.custom.ironMg === 9 && !('bogus' in refs.json.custom))
+  const unknown = await call('PUT', '/api/settings/theme', {})
+  check('unknown setting rejected', unknown.status === 400)
+
   const backup = await call('GET', '/api/export')
   check('export has only custom foods', backup.json.foods.every((f: any) => f.isCustom))
   const restored = await call('POST', '/api/import', backup.json)
   check('backup round-trip keeps meal items', restored.json.meals[0]?.items?.length >= 1, restored.json.meals)
   check('backup round-trip keeps symptoms', restored.json.symptoms[0]?.reactions?.length === 1 && restored.json.dailyMetrics.length === 1)
+  check('backup round-trip keeps settings', restored.json.settings.childProfile.birthDate === '2023-05-04')
   check('backup round-trip keeps blood flag', restored.json.poops[0]?.visibleBlood === true)
 } finally {
   server.close()
