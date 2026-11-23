@@ -75,7 +75,7 @@ export function NutritionPanel({
                   <td>
                     <span className="amt">
                       {item.partial && item.status !== 'insufficient' ? '≥ ' : ''}
-                      {item.eaten === 0 ? '—' : amount(item.key, item.amount)}
+                      {amount(item.key, item.amount)}
                     </span>
                     {item.energyShare != null && <small>{Math.round(item.energyShare)}% of energy</small>}
                     {item.partial && <small>{item.covered}/{item.eaten} foods with data</small>}

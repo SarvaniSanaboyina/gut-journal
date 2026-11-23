@@ -1368,7 +1368,6 @@ input[type='search'] {
 }
 .hist-cell.untracked { background: transparent; color: var(--ink-soft); }
 .hist-cell.not-logged { border: 1px dashed #e57373; }
-.hist-cell.no-food { background-image: repeating-linear-gradient(135deg, transparent 0 5px, rgba(0, 0, 0, 0.07) 5px 7px) !important; }
 .hist-cell.insufficient { background-image: repeating-linear-gradient(45deg, transparent 0 5px, rgba(0, 0, 0, 0.05) 5px 7px) !important; }
 .hist-cell.today .hist-num { color: #fff; background: var(--sage); border-radius: 999px; padding: 0 6px; }
 .hist-cell.selected { box-shadow: 0 0 0 2px var(--sage); }
@@ -1390,7 +1389,6 @@ input[type='search'] {
 .cal-legend p { margin: 8px 0 0; font-size: 0.74rem; color: var(--ink-soft); }
 .cal-swatch { width: 16px; height: 16px; border-radius: 4px; border: 1px solid rgba(0, 0, 0, 0.12); flex: none; display: inline-block; }
 .cal-swatch.not-logged { border: 1px dashed #e57373; }
-.cal-swatch.no-food { background-image: repeating-linear-gradient(135deg, transparent 0 3px, rgba(0, 0, 0, 0.12) 3px 4px) !important; }
 .cal-swatch.insufficient { background-image: repeating-linear-gradient(45deg, transparent 0 3px, rgba(0, 0, 0, 0.1) 3px 4px) !important; }
 .cal-legend-ml { font-size: 0.66rem; font-weight: 700; background: #f3f0f7; border-radius: 4px; padding: 1px 4px; }
 .threshold-form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }

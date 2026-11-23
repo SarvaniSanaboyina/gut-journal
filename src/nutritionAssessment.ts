@@ -169,6 +169,8 @@ function assessOne(
   }
 
   if (kind === 'share') {
+    // Nothing eaten (every meal skipped or refused) is a recorded zero, not missing data.
+    if (eaten === 0) return result('below', 'No food was eaten.')
     // Judged as % of energy; needs both this nutrient and energy to be reasonably complete.
     if (!complete || !energy.complete || energyShare == null) {
       return result('insufficient', !complete ? `Only ${covered.length} of ${eaten} foods eaten have data.` : 'Energy could not be estimated, so its share of energy is unknown.')
@@ -199,14 +201,13 @@ function assessOne(
 // ---------------------------------------------------------------------------
 // Day assessment
 
-export type DayNutritionStatus = 'below' | 'within' | 'above' | 'insufficient' | 'no-food'
+export type DayNutritionStatus = 'below' | 'within' | 'above' | 'insufficient'
 
 export const DAY_STATUS_META: Record<DayNutritionStatus, { label: string; legend: string; color: string }> = {
   below: { label: 'Below range', legend: 'Nutrition generally below the reference range', color: '#FFF3B0' },
   within: { label: 'Within range', legend: 'Nutrition generally within the reference range', color: '#C8E6C9' },
   above: { label: 'Above range', legend: 'Above the usual range or an upper limit', color: '#BBDEFB' },
   insufficient: { label: 'Assessment unavailable', legend: 'All meals recorded, not enough nutrient data', color: '#E0E0E0' },
-  'no-food': { label: 'No food eaten', legend: 'All five meals marked not eaten', color: '#E0E0E0' },
 }
 
 export type DayNutrition = {
@@ -246,28 +247,30 @@ export function assessDay(meals: MealEntry[], foods: FoodEntry[], settings: Sett
   const overUpperLimit = nutrients.filter((item) => item.status === 'over-ul').map((item) => item.key)
   const base = { nutrients, missing, band: refs.band, referenceNote: refs.note, overUpperLimit }
 
+  // A day where every meal was skipped (or every food refused) is still a logged day: it is
+  // assessed as zero intake rather than set aside, so the nutrition shortfall is visible.
   const eatenCount = all.filter((item) => item.status !== 'refused').length
-  if (eatenCount === 0) return { ...base, status: 'no-food', reasons: ['No food was eaten.'] }
+  const noFoodReason = eatenCount === 0 ? ['No food was eaten — every meal was skipped or refused.'] : []
 
   const keys = [...new Set<NutrientKey>(['energyKcal', 'proteinG', ...config.keyNutrients])]
   const key = keys.map((nutrient) => byKey[nutrient])
   const insufficient = key.filter((item) => item.status === 'insufficient')
   if (byKey.energyKcal.status === 'insufficient' || byKey.proteinG.status === 'insufficient') {
-    return { ...base, status: 'insufficient', reasons: ['Energy and protein could not both be estimated from the foods recorded.'] }
+    return { ...base, status: 'insufficient', reasons: [...noFoodReason, 'Energy and protein could not both be estimated from the foods recorded.'] }
   }
   if (insufficient.length * 3 > key.length) {
-    return { ...base, status: 'insufficient', reasons: [`${insufficient.length} of ${key.length} key nutrients lack enough data.`] }
+    return { ...base, status: 'insufficient', reasons: [...noFoodReason, `${insufficient.length} of ${key.length} key nutrients lack enough data.`] }
   }
 
   const reasons: string[] = []
   const overKey = key.filter((item) => item.status === 'over-ul')
   if (overKey.length) {
     reasons.push(`${overKey.map((item) => NUTRIENTS[item.key].label).join(', ')} above the upper limit.`)
-    return { ...base, status: 'above', reasons }
+    return { ...base, status: 'above', reasons: [...noFoodReason, ...reasons] }
   }
-  if (byKey.energyKcal.status === 'above') return { ...base, status: 'above', reasons: ['Energy is above the usual range.'] }
+  if (byKey.energyKcal.status === 'above') return { ...base, status: 'above', reasons: [...noFoodReason, 'Energy is above the usual range.'] }
   if (byKey.proteinG.status === 'above' && byKey.proteinG.energyShare != null && byKey.proteinG.amdr && byKey.proteinG.energyShare > byKey.proteinG.amdr[1]) {
-    return { ...base, status: 'above', reasons: ['Protein supplies more energy than the recommended range.'] }
+    return { ...base, status: 'above', reasons: [...noFoodReason, 'Protein supplies more energy than the recommended range.'] }
   }
 
   const assessed = key.filter((item) => item.status !== 'insufficient')
@@ -276,7 +279,7 @@ export function assessDay(meals: MealEntry[], foods: FoodEntry[], settings: Sett
   const belowOthers = below.filter((item) => item.key !== 'energyKcal')
   if (belowOthers.length) reasons.push(`Below the recommendation: ${belowOthers.map((item) => NUTRIENTS[item.key].label.toLowerCase()).join(', ')}.`)
   if (byKey.energyKcal.status === 'below' || (assessed.length && (below.length / assessed.length) * 100 >= config.belowSharePercent)) {
-    return { ...base, status: 'below', reasons }
+    return { ...base, status: 'below', reasons: [...noFoodReason, ...reasons] }
   }
   return { ...base, status: 'within', reasons: reasons.length ? reasons : ['Key nutrients are within their recommended ranges.'] }
 }
@@ -291,24 +294,23 @@ export const CALENDAR_META: Record<CalendarState, { label: string; legend: strin
   'not-logged': { label: 'Meals not logged', legend: 'One or more of the five meals not logged', color: '#FFCDD2' },
 }
 
-export const CALENDAR_LEGEND_ORDER: CalendarState[] = ['below', 'within', 'above', 'not-logged', 'insufficient', 'no-food']
+export const CALENDAR_LEGEND_ORDER: CalendarState[] = ['below', 'within', 'above', 'not-logged', 'insufficient']
 
 /**
  * The calendar colour for a day. Meal tracking comes first: any Not logged slot makes the day red
- * regardless of the nutrient estimates, because missing meals are not zero intake. Only a fully
- * recorded day gets a nutrition colour. `meals` should include "Other" meals, which count for
- * nutrition even though they are not one of the five slots.
+ * regardless of the nutrient estimates, because missing meals are not zero intake. A skipped meal
+ * (marked Not eaten) is a logged meal, so a fully recorded day — even one where every meal was
+ * skipped — gets a nutrition colour and assessment. `meals` should include "Other" meals, which
+ * count for nutrition even though they are not one of the five slots.
  */
 export function calendarState(
   slotsComplete: boolean,
-  allSkipped: boolean,
   meals: MealEntry[],
   foods: FoodEntry[],
   settings: Settings,
   date: string,
 ): { state: CalendarState; nutrition: DayNutrition | null } {
   if (!slotsComplete) return { state: 'not-logged', nutrition: null }
-  if (allSkipped && meals.length === 0) return { state: 'no-food', nutrition: null }
   const nutrition = assessDay(meals, foods, settings, date)
   return { state: nutrition.status, nutrition }
 }

@@ -209,7 +209,7 @@ export function summarisePeriod(data: JournalData, range: ReportRange): PeriodSu
   const waterDays = daySummaries.filter((day) => day.waterMl != null)
   const nutritionDays = { within: 0, below: 0, above: 0, insufficient: 0, notAssessed: 0, overUpperLimit: 0 }
   for (const day of daySummaries) {
-    const { state, nutrition } = calendarState(day.completion.status === 'complete', day.completion.skipped === 5, day.records.meals, data.foods, data.settings, day.date)
+    const { state, nutrition } = calendarState(day.completion.status === 'complete', day.records.meals, data.foods, data.settings, day.date)
     if (state === 'within' || state === 'below' || state === 'above' || state === 'insufficient') nutritionDays[state] += 1
     else nutritionDays.notAssessed += 1
     if (nutrition?.overUpperLimit.length) nutritionDays.overUpperLimit += 1

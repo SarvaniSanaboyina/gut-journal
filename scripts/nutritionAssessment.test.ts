@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { assessDay, DEFAULT_ASSESSMENT } from '../src/nutritionAssessment.ts'
+import { assessDay, calendarState, DEFAULT_ASSESSMENT } from '../src/nutritionAssessment.ts'
 import { emptyJournal, type FoodEntry, type MealEntry, type MealItem, type Nutrients, type Settings } from '../src/types.ts'
 
 const DATE = '2026-11-18'
@@ -130,8 +130,23 @@ describe('day status', () => {
     assert.equal(iron.partial, true)
   })
 
-  it('ignores refused foods and reports no food when nothing was eaten', () => {
-    assert.equal(assess([item('balanced', 1000, 0)]).status, 'no-food')
+  it('assesses a day where everything was refused as zero intake (below), with every nutrient shown', () => {
+    const day = assess([item('balanced', 1000, 0)])
+    assert.equal(day.status, 'below')
+    assert.match(day.reasons[0], /No food was eaten/)
+    for (const nutrient of day.nutrients) {
+      assert.equal(nutrient.amount, 0, nutrient.key)
+      assert.equal(nutrient.status, 'below', nutrient.key)
+    }
+  })
+
+  it('treats a fully recorded day with every meal skipped as logged and shows its nutrition', () => {
+    const skipped = calendarState(true, [], FOODS, settings(), DATE)
+    assert.equal(skipped.state, 'below')
+    assert.ok(skipped.nutrition)
+    assert.equal(skipped.nutrition!.nutrients.find((n) => n.key === 'energyKcal')!.reference, 1110)
+    // An unmarked meal is still "not logged": nothing is assumed.
+    assert.deepEqual(calendarState(false, [], FOODS, settings(), DATE), { state: 'not-logged', nutrition: null })
   })
 
   it('follows configuration', () => {

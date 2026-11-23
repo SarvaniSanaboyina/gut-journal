@@ -7,7 +7,7 @@ The code lives in `src/nutritionAssessment.ts`, and the tests in `scripts/nutrit
 ## Order of decisions for a day
 
 1. **Red: meals not logged.** Any of the five scheduled meals is Not logged. Missing meals are never counted as zero intake, so no nutrition colour is computed, even when some estimates exist. The day sheet still lists the estimates so far.
-2. **Grey striped: no food eaten.** All five meals were marked Not eaten.
+2. **Skipped meals count as logged.** A meal marked Not eaten is a recorded meal, not missing data. A day where every meal was skipped is assessed like any other, at zero intake, so it shows as below range with its full nutrition table.
 3. **Grey: assessment unavailable.** The day is fully recorded, but either:
    - energy or protein can't be estimated, or
    - more than a third of the key nutrients lack enough data.

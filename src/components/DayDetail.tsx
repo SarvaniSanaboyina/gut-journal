@@ -46,7 +46,7 @@ export function DayDetail({
   const summary = useMemo(() => summariseDay(buildDayIndex(data), date, foodMap(data.foods)), [data, date])
   const { completion, records } = summary
   const calendar = useMemo(
-    () => calendarState(completion.status === 'complete', completion.skipped === 5, records.meals, data.foods, data.settings, date),
+    () => calendarState(completion.status === 'complete', records.meals, data.foods, data.settings, date),
     [completion, records.meals, data.foods, data.settings, date],
   )
   // Show what is known so far even on an incomplete day; the colour stays "not logged".

@@ -247,7 +247,7 @@ export function HistoryView({
             const future = iso > today
             const tracked = !future && iso >= firstLogged
             const day = summariseDay(dayIndex, iso, foods)
-            const { state } = calendarState(day.completion.status === 'complete', day.completion.skipped === 5, day.records.meals, data.foods, data.settings, iso)
+            const { state } = calendarState(day.completion.status === 'complete', day.records.meals, data.foods, data.settings, iso)
             const meta = CALENDAR_META[state]
             const water = day.waterMl == null ? null : formatTotalMl(day.waterMl).replace(' ', '\u00a0')
             const classes = [
