@@ -33,7 +33,7 @@ export function FoodPicker({
   const shelf = useMemo(() => {
     if (category === 'recent') return recent.length ? recent : common
     return foods
-      .filter((food) => food.category === category)
+      .filter((food) => food.category === category && !food.isReference)
       .sort((a, b) => Number(b.isCustom) - Number(a.isCustom) || a.name.localeCompare(b.name))
   }, [category, common, foods, recent])
   const trimmed = query.trim()

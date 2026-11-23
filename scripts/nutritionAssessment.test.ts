@@ -17,7 +17,7 @@ function nutrients(values: Partial<Nutrients>): Nutrients {
 function food(id: string, values: Partial<Nutrients>, source: FoodEntry['nutrientSource'] = 'ifct'): FoodEntry {
   return {
     id, name: id, aliases: [], category: 'cereals', groups: [], defaultUnit: 'g', defaultQty: 100, unitGrams: {},
-    nutrients: nutrients(values), nutrientSource: source, sourceNote: '', ingredients: [], isCustom: false,
+    nutrients: nutrients(values), nutrientSource: source, sourceNote: '', ingredients: [], isCustom: false, isReference: false, recipe: null,
   }
 }
 

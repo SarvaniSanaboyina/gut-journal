@@ -64,6 +64,8 @@ export type CatalogFood = {
   /** Set from COMPOSITION below. */
   source?: CompositionSource
   compositionNote?: string
+  /** A raw IFCT 2017 food: searchable, but not shown on category shelves. */
+  reference?: boolean
 }
 
 /** kcal, protein g, carbs g, fat g, fibre g, iron mg, calcium mg, vitamin D µg, zinc mg, vitamin C mg, omega-3 g */
@@ -159,6 +161,8 @@ export const FOOD_CATALOG: CatalogFood[] = [
   { id: 'pear', name: 'Pear', aliases: ['nashpati'], category: 'fruits', groups: ['fruit'], defaultUnit: 'pieces', defaultQty: 0.5, unitGrams: { pieces: 170, ...FRUIT_PIECES }, nutrients: n(57, 0.4, 15.2, 0.1, 3.1, 0.18, 9, 0, 0.1, 4.3, null) },
   { id: 'dates', name: 'Dates', aliases: ['khajur', 'pericham pazham'], category: 'fruits', groups: ['fruit'], defaultUnit: 'pieces', defaultQty: 2, unitGrams: { pieces: 8 }, nutrients: n(282, 2.5, 75, 0.4, 8, 1, 39, 0, 0.3, 0.4, null) },
   { id: 'raisins', name: 'Raisins', aliases: ['kishmish', 'dry grapes'], category: 'fruits', groups: ['fruit'], defaultUnit: 'spoons', defaultQty: 1, unitGrams: { spoons: 10, pieces: 0.5 }, nutrients: n(299, 3.1, 79, 0.5, 3.7, 1.9, 50, 0, 0.2, 2.3, null) },
+  { id: 'anjir', name: 'Anjir (dried fig)', aliases: ['anjeer', 'fig', 'dried fig', 'athipazham', 'atti pandu'], category: 'fruits', groups: ['fruit'], defaultUnit: 'pieces', defaultQty: 1, unitGrams: { pieces: 8, spoons: 10 }, nutrients: n(null, null, null, null, null, null, null, null, null, null, null) },
+  { id: 'dried-apricot', name: 'Dried apricot', aliases: ['khubani', 'jardalu', 'apricot'], category: 'fruits', groups: ['fruit'], defaultUnit: 'pieces', defaultQty: 2, unitGrams: { pieces: 7, spoons: 10 }, nutrients: n(null, null, null, null, null, null, null, null, null, null, null) },
   { id: 'avocado', name: 'Avocado', aliases: ['butter fruit'], category: 'fruits', groups: ['fruit', 'fat'], defaultUnit: 'spoons', defaultQty: 3, unitGrams: { spoons: 15, pieces: 150, cups: 150 }, nutrients: n(160, 2, 8.5, 14.7, 6.7, 0.6, 12, 0, 0.6, 10, 0.11) },
 
   // Vegetables
@@ -186,6 +190,8 @@ export const FOOD_CATALOG: CatalogFood[] = [
   { id: 'peanut-butter', name: 'Peanut butter', category: 'fats', groups: ['fat', 'protein'], defaultUnit: 'spoons', defaultQty: 0.5, unitGrams: { spoons: 16 }, nutrients: n(588, 25, 20, 50, 6, 1.9, 43, 0, 2.9, 0, 0) },
   { id: 'almonds', name: 'Almonds (powdered or soaked)', aliases: ['badam', 'almond'], category: 'fats', groups: ['fat', 'protein'], defaultUnit: 'pieces', defaultQty: 4, unitGrams: { pieces: 1.2, spoons: 7 }, nutrients: n(579, 21, 22, 50, 12.5, 3.7, 269, 0, 3.1, 0, 0) },
   { id: 'walnuts', name: 'Walnuts (powdered)', aliases: ['akhrot', 'walnut'], category: 'fats', groups: ['fat'], defaultUnit: 'pieces', defaultQty: 2, unitGrams: { pieces: 2, spoons: 7 }, nutrients: n(654, 15, 14, 65, 6.7, 2.9, 98, 0, 3.1, 1.3, 9.1) },
+  { id: 'cashew', name: 'Cashew', aliases: ['kaju', 'cashew nut', 'mundiri', 'jeedi pappu'], category: 'fats', groups: ['fat', 'protein'], defaultUnit: 'pieces', defaultQty: 4, unitGrams: { pieces: 1.5, spoons: 8 }, nutrients: n(null, null, null, null, null, null, null, null, null, null, null) },
+  { id: 'pista', name: 'Pista', aliases: ['pistachio', 'pistachios'], category: 'fats', groups: ['fat', 'protein'], defaultUnit: 'pieces', defaultQty: 5, unitGrams: { pieces: 0.7, spoons: 8 }, nutrients: n(null, null, null, null, null, null, null, null, null, null, null) },
   { id: 'flaxseed', name: 'Flaxseed powder', aliases: ['alsi', 'linseed'], category: 'fats', groups: ['fat'], defaultUnit: 'spoons', defaultQty: 0.5, unitGrams: { spoons: 7 }, nutrients: n(534, 18, 29, 42, 27, 5.7, 255, 0, 4.3, 0.6, 22.8) },
   { id: 'coconut', name: 'Coconut (fresh)', aliases: ['thengai', 'nariyal', 'grated coconut'], category: 'fats', groups: ['fat'], defaultUnit: 'spoons', defaultQty: 1, unitGrams: { spoons: 8, cups: 80 }, nutrients: n(354, 3.3, 15, 33, 9, 2.4, 14, 0, 1.1, 3.3, 0) },
   { id: 'coconut-chutney', name: 'Coconut chutney', aliases: ['chutney'], category: 'fats', groups: ['fat'], defaultUnit: 'spoons', defaultQty: 2, unitGrams: { spoons: 15, bowls: 100 }, nutrients: n(180, 2.5, 8, 16, 4.5, 1, 15, null, 0.6, 2, null), ingredients: ['coconut'] },
@@ -218,7 +224,11 @@ export const FOOD_CATALOG: CatalogFood[] = [
  * - Foods not listed (packaged and processed foods, and a few not in IFCT 2017) keep the
  *   approximate values above and are shown as estimates.
  */
-type Composition = { ifct: string } | { parts: [string, number][]; cooked: number }
+type Composition =
+  | { ifct: string }
+  /** Dried form of an IFCT fresh food: concentrated by removing water down to `moisture` %. */
+  | { ifct: string; driedTo: number }
+  | { parts: [string, number][]; cooked: number }
 
 const COMPOSITION: Record<string, Composition> = {
   // Cereals — cooked weights are typical home yields
@@ -267,6 +277,9 @@ const COMPOSITION: Record<string, Composition> = {
   dates: { ifct: 'E017' },
   raisins: { ifct: 'E057' },
   avocado: { ifct: 'E007' },
+  // IFCT 2017 lists fresh fig only; dried anjir is about 30 % moisture (vitamin C is mostly lost on drying).
+  anjir: { ifct: 'E020', driedTo: 30 },
+  'dried-apricot': { ifct: 'E005' },
   // Vegetables
   carrot: { ifct: 'F002' },
   spinach: { ifct: 'C033' },
@@ -288,6 +301,8 @@ const COMPOSITION: Record<string, Composition> = {
   ghee: { ifct: 'T013' },
   almonds: { ifct: 'H001' },
   walnuts: { ifct: 'H021' },
+  cashew: { ifct: 'H005' },
+  pista: { ifct: 'H018' },
   flaxseed: { ifct: 'H014' },
   coconut: { ifct: 'H007' },
   'coconut-chutney': { parts: [['H007', 40], ['B001', 10], ['T005', 2]], cooked: 100 },
@@ -295,7 +310,17 @@ const COMPOSITION: Record<string, Composition> = {
 }
 
 function compose(composition: Composition): Nutrients {
-  if ('ifct' in composition) return { ...IFCT[composition.ifct].nutrients }
+  if ('ifct' in composition) {
+    const food = IFCT[composition.ifct]
+    if (!('driedTo' in composition) || food.water == null) return { ...food.nutrients }
+    const factor = (100 - composition.driedTo) / (100 - food.water)
+    const dried = {} as Nutrients
+    for (const key of NUTRIENT_KEYS) {
+      const value = food.nutrients[key]
+      dried[key] = value == null ? null : key === 'vitaminCMg' ? null : Math.round(value * factor * 1000) / 1000
+    }
+    return dried
+  }
   const result = {} as Nutrients
   for (const key of NUTRIENT_KEYS) {
     let total: number | null = 0
@@ -320,9 +345,57 @@ for (const food of FOOD_CATALOG) {
   food.nutrients = compose(composition)
   food.source = 'ifct' in composition ? 'ifct' : 'recipe'
   food.compositionNote =
-    'ifct' in composition
+    'driedTo' in composition
+      ? `IFCT 2017 ${composition.ifct}: ${IFCT[composition.ifct].name}, concentrated to ${composition.driedTo}% moisture for the dried form`
+      : 'ifct' in composition
       ? `IFCT 2017 ${composition.ifct}: ${IFCT[composition.ifct].name}`
       : `Recipe from IFCT 2017: ${composition.parts.map(([code, grams]) => `${grams} g ${IFCT[code].name.toLowerCase()}`).join(', ')} → ${composition.cooked} g cooked`
 }
 
 export const CATALOG_IDS = new Set(FOOD_CATALOG.map((food) => food.id))
+
+// ---------------------------------------------------------------------------
+// The full IFCT 2017 table as searchable reference foods (raw composition, per 100 g edible
+// portion). They are found by search and usable as recipe ingredients, but are kept off the
+// category shelves so the everyday list stays short.
+
+const GROUP_MAP: Record<string, { category: FoodCategory; groups: FoodGroup[]; qty: number }> = {
+  'Cereals and Millets': { category: 'cereals', groups: ['carbohydrate'], qty: 50 },
+  'Grain Legumes': { category: 'legumes', groups: ['protein'], qty: 30 },
+  'Green Leafy Vegetables': { category: 'vegetables', groups: ['vegetable'], qty: 30 },
+  'Other Vegetables': { category: 'vegetables', groups: ['vegetable'], qty: 30 },
+  'Roots and Tubers': { category: 'vegetables', groups: ['vegetable', 'carbohydrate'], qty: 30 },
+  Mushrooms: { category: 'vegetables', groups: ['vegetable'], qty: 30 },
+  'Condiments and Spices': { category: 'vegetables', groups: [], qty: 5 },
+  Fruits: { category: 'fruits', groups: ['fruit'], qty: 50 },
+  'Nuts and Oil Seeds': { category: 'fats', groups: ['fat', 'protein'], qty: 10 },
+  'Edible Oils and Fats': { category: 'fats', groups: ['fat'], qty: 5 },
+  'Milk and Milk Products': { category: 'dairy', groups: ['protein'], qty: 100 },
+  'Egg and Egg Products': { category: 'protein', groups: ['protein', 'fat'], qty: 50 },
+  Poultry: { category: 'protein', groups: ['protein'], qty: 50 },
+  'Animal Meat': { category: 'protein', groups: ['protein'], qty: 50 },
+  'Marine Fish': { category: 'protein', groups: ['protein'], qty: 50 },
+  'Marine Shellfish': { category: 'protein', groups: ['protein'], qty: 50 },
+  'Marine Mollusks': { category: 'protein', groups: ['protein'], qty: 50 },
+  'Fresh Water Fish and Shellfish': { category: 'protein', groups: ['protein'], qty: 50 },
+  Sugars: { category: 'snacks', groups: [], qty: 10 },
+  'Miscellaneous Foods': { category: 'beverages', groups: [], qty: 100 },
+}
+
+export const REFERENCE_FOODS: CatalogFood[] = Object.entries(IFCT).map(([code, food]) => {
+  const map = GROUP_MAP[food.group] ?? GROUP_MAP[Object.keys(GROUP_MAP).find((key) => food.group.startsWith(key.slice(0, 20))) ?? ''] ?? { category: 'snacks', groups: [], qty: 50 }
+  return {
+    id: `ifct-${code.toLowerCase()}`,
+    name: food.name,
+    aliases: food.aliases,
+    category: map.category,
+    groups: map.groups,
+    defaultUnit: 'g',
+    defaultQty: map.qty,
+    unitGrams: {},
+    nutrients: { ...food.nutrients },
+    source: 'ifct',
+    compositionNote: `IFCT 2017 ${code}: ${food.name} (raw, per 100 g edible portion)`,
+    reference: true,
+  }
+})

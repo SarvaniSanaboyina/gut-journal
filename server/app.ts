@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { gzipSync } from 'node:zlib'
 import type { PrismaClient } from '@prisma/client'
 import express, { type NextFunction, type Request, type Response } from 'express'
 import {
@@ -164,9 +165,16 @@ export function createApp(prisma: PrismaClient, options: { distDir?: string } = 
     }
   })
 
-  app.get('/api/journal', async (_req, res) => {
+  app.get('/api/journal', async (req, res) => {
     res.set('cache-control', 'no-store')
-    res.json(await readJournal(prisma))
+    const body = JSON.stringify(await readJournal(prisma))
+    // The journal includes the full food list (about 630 foods), so compress it when the browser allows.
+    if (/\bgzip\b/.test(String(req.headers['accept-encoding'] ?? ''))) {
+      res.set({ 'content-type': 'application/json; charset=utf-8', 'content-encoding': 'gzip', vary: 'accept-encoding' })
+      res.send(gzipSync(body))
+      return
+    }
+    res.type('application/json').send(body)
   })
 
   app.get('/api/export', async (_req, res) => {

@@ -1456,3 +1456,20 @@ input[type='search'] {
 .meal-nutrient-foods li small { color: var(--muted); font-size: 0.76rem; }
 .meal-nutrient-foods li.refused .food-name { text-decoration: line-through; color: var(--muted); }
 .meal-nutrient-foods li.missing small { color: #8a5a00; }
+
+/* Recipe builder */
+.recipe-builder { display: grid; gap: 10px; border: 1px solid var(--line); border-radius: 16px; padding: 12px; background: var(--wash); }
+.recipe-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.recipe-rows li { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; display: grid; gap: 6px; }
+.recipe-row-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.recipe-row-amount { display: grid; grid-template-columns: minmax(70px, 110px) minmax(90px, 130px) minmax(0, 1fr); gap: 8px; align-items: center; }
+.recipe-row-amount select { min-height: 42px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); padding: 0 8px; }
+.recipe-row-amount small { color: var(--muted); font-size: 0.76rem; }
+.recipe-row-amount small.warn { color: #8a5a00; }
+.recipe-preview { background: var(--card); border-radius: 12px; padding: 10px 12px; }
+.recipe-preview dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px 12px; margin: 8px 0 0; }
+.recipe-preview dt { font-size: 0.72rem; color: var(--muted); font-weight: 650; }
+.recipe-preview dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.recipe-preview dd small { display: block; font-weight: 500; color: var(--ink-soft); font-size: 0.74rem; }
+.food-chip small { margin-left: 4px; font-size: 0.66rem; color: var(--muted); font-weight: 700; }
+@media (max-width: 420px) { .recipe-row-amount { grid-template-columns: 80px 100px; } .recipe-row-amount small { grid-column: 1 / -1; } }

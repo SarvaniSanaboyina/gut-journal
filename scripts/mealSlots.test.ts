@@ -19,7 +19,7 @@ const DATE = '2026-11-18'
 function food(id: string, unitGrams: FoodEntry['unitGrams'] = {}): FoodEntry {
   return {
     id, name: id, aliases: [], category: 'cereals', groups: ['carbohydrate'], defaultUnit: 'pieces', defaultQty: 1,
-    unitGrams, nutrients: {} as FoodEntry['nutrients'], nutrientSource: 'none', sourceNote: '', ingredients: [], isCustom: false,
+    unitGrams, nutrients: {} as FoodEntry['nutrients'], nutrientSource: 'none', sourceNote: '', ingredients: [], isCustom: false, isReference: false, recipe: null,
   }
 }
 

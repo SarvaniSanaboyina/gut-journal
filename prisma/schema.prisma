@@ -135,6 +135,8 @@ model FoodItem {
   sourceNote     String     @default("") @map("source_note")
   ingredients    Json       @default("[]")
   isCustom       Boolean    @default(false) @map("is_custom")
+  isReference    Boolean    @default(false) @map("is_reference")
+  recipe         Json?
   createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt      DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
   mealItems      MealItem[]

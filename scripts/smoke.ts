@@ -56,6 +56,34 @@ try {
     unitGrams: { pieces: 30 }, nutrients: { energyKcal: 420, proteinG: 8 },
   })
   check('custom food saved', food.status === 200 && food.json.nutrientSource === 'label', food.json)
+  // Dry fruits and the IFCT 2017 reference foods
+  const catalogue = await call('GET', '/api/journal')
+  const foodsById = new Map(catalogue.json.foods.map((f: any) => [f.id, f]))
+  check('cashew, pista and anjir in the list', ['cashew', 'pista', 'anjir'].every((id) => (foodsById.get(id) as any)?.nutrientSource === 'ifct'))
+  check('all 542 IFCT foods available as reference foods', catalogue.json.foods.filter((f: any) => f.isReference).length === 542)
+  check('IFCT local names searchable (kaju)', (foodsById.get('ifct-h005') as any)?.aliases.includes('kaju'))
+
+  // Recipe: nutrients are calculated on the server from the ingredients, whatever the client sends
+  const cashew = foodsById.get('cashew') as any
+  const milk = foodsById.get('milk') as any
+  const recipe = await call('PUT', '/api/foods', {
+    id: 'custom-kaju-milk', name: 'Kaju milk', category: 'beverages', groups: ['protein'], defaultUnit: 'pieces',
+    nutrients: { energyKcal: 9999 },
+    recipe: { ingredients: [
+      { foodId: 'cashew', name: 'Cashew', quantity: 20, unit: 'g', grams: 20 },
+      { foodId: 'milk', name: 'Milk', quantity: 200, unit: 'ml', grams: 206 },
+    ], cookedGrams: 200, pieces: 2 },
+  })
+  const expectedKcal = ((cashew.nutrients.energyKcal * 20) / 100 + (milk.nutrients.energyKcal * 206) / 100) / 200 * 100
+  check('recipe nutrients calculated from ingredients', recipe.status === 200 && Math.abs(recipe.json.nutrients.energyKcal - expectedKcal) < 0.01, recipe.json)
+  check('recipe source, piece weight and ingredient links', recipe.json.nutrientSource === 'recipe' && recipe.json.unitGrams.pieces === 100 && recipe.json.ingredients.includes('cashew'))
+  const noData = await call('PUT', '/api/foods', { id: 'custom-bad', name: 'Sweet', category: 'snacks', recipe: { ingredients: [{ foodId: 'mithai', name: 'Mithai', quantity: 50, unit: 'g', grams: 50 }] } })
+  check('ingredient without nutrient data rejected', noData.status === 400)
+  const unknownFood = await call('PUT', '/api/foods', { id: 'custom-bad', name: 'Sweet', category: 'snacks', recipe: { ingredients: [{ foodId: 'no-such-food', name: 'Nope', quantity: 50, unit: 'g', grams: 50 }] } })
+  check('unknown ingredient rejected', unknownFood.status === 400)
+  const self = await call('PUT', '/api/foods', { id: 'custom-kaju-milk', name: 'Kaju milk', category: 'beverages', recipe: { ingredients: [{ foodId: 'custom-kaju-milk', name: 'Kaju milk', quantity: 50, unit: 'g', grams: 50 }] } })
+  check('recipe cannot include itself', self.status === 400)
+
   const builtIn = await call('PUT', '/api/foods', { id: 'idli', name: 'Idli', category: 'cereals' })
   check('built-in food protected', builtIn.status === 400)
 
@@ -187,6 +215,8 @@ try {
   check('backup round-trip keeps settings', restored.json.settings.childProfile.birthDate === '2023-05-04')
   check('backup round-trip keeps blood flag', restored.json.poops[0]?.visibleBlood === true)
   check('backup round-trip keeps not-eaten slots and assessment settings', restored.json.mealSlots.length === 1 && restored.json.settings.nutritionAssessment.lowPercent === 75)
+  const restoredRecipe = restored.json.foods.find((f: any) => f.id === 'custom-kaju-milk')
+  check('backup round-trip keeps recipe foods', restoredRecipe?.nutrientSource === 'recipe' && restoredRecipe.recipe.ingredients.length === 2 && restoredRecipe.nutrients.energyKcal > 0)
   check('backup round-trip keeps growth', restored.json.growth.length === 1 && restored.json.growth[0].weightKg === 12.4)
 
   const refuseWipe = await call('POST', '/api/delete-all', {})

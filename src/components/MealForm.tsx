@@ -554,6 +554,7 @@ export function MealForm({
         <Modal title="Add a new food" onClose={() => setCreating(null)}>
           <CustomFoodForm
             name={creating.name}
+            foods={foods}
             onCancel={() => setCreating(null)}
             onSave={async (food) => {
               const saved = await onSaveFood(food)

@@ -168,7 +168,8 @@ export function searchFoods(foods: FoodEntry[], query: string, limit = 12): Food
       else if (name.split(' ').some((word) => word.startsWith(q))) score = Math.max(score, 60)
       else if (name.includes(q)) score = Math.max(score, 40)
     }
-    if (score) scored.push({ food, score: score + (food.isCustom ? 5 : 0) })
+    // Everyday and family foods rank above the raw IFCT reference entries with similar names.
+    if (score) scored.push({ food, score: score + (food.isCustom ? 5 : 0) + (food.isReference ? 0 : 25) })
   }
   return scored
     .sort((a, b) => b.score - a.score || a.food.name.localeCompare(b.food.name))

@@ -7,7 +7,7 @@ import { CustomFoodForm } from './CustomFoodForm'
 function SourceTag({ food }: { food: FoodEntry }) {
   if (food.nutrientSource === 'label') return <span className="tag label">From label</span>
   if (food.nutrientSource === 'ifct') return <span className="tag label">IFCT 2017</span>
-  if (food.nutrientSource === 'recipe') return <span className="tag label">IFCT recipe</span>
+  if (food.nutrientSource === 'recipe') return <span className="tag label">{food.isCustom ? 'Your recipe' : 'IFCT recipe'}</span>
   if (food.nutrientSource === 'catalogue') return <span className="tag estimate">Estimate</span>
   return <span className="tag missing">No nutrient data</span>
 }
@@ -61,7 +61,9 @@ export function FoodsManager({
 
   const list = useMemo(() => {
     if (query.trim()) return searchFoods(foods, query, 50)
+    // The 542 IFCT reference foods are found by search; browsing shows the everyday list.
     return foods
+      .filter((food) => !food.isReference)
       .filter((food) => (category === 'all' ? true : category === 'mine' ? food.isCustom : food.category === category))
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [foods, query, category])
@@ -71,6 +73,7 @@ export function FoodsManager({
     return (
       <CustomFoodForm
         initial={food}
+        foods={foods}
         name={open === 'new' ? query.trim() : undefined}
         onCancel={() => setOpen(null)}
         onSave={async (next) => {
@@ -105,7 +108,7 @@ export function FoodsManager({
 
   return (
     <div className="form-grid">
-      <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search the food list" aria-label="Search the food list" />
+      <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search all foods — including 542 from IFCT 2017" aria-label="Search the food list" />
       {!query.trim() && (
         <div className="shelf-tabs">
           {(['all', 'mine'] as const).map((id) => (
@@ -129,7 +132,7 @@ export function FoodsManager({
             <span aria-hidden="true">{categoryMeta(food.category).icon}</span>
             <span>
               {food.name}
-              <small>{food.isCustom ? 'Added by you' : categoryMeta(food.category).label}</small>
+              <small>{food.isCustom ? (food.recipe ? 'Your recipe' : 'Added by you') : food.isReference ? 'IFCT 2017 food database' : categoryMeta(food.category).label}</small>
             </span>
             <SourceTag food={food} />
           </button>

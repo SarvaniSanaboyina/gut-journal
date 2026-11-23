@@ -86,6 +86,17 @@ ICMR-NIN 2020 and IOM references for ages 1–6 are the same for girls and boys,
 - **Vitamin D:** only cholecalciferol (D3) is counted. IFCT lists ergocalciferol (D2) for some cereals at levels far above other databases, e.g. ragi 41 µg/100 g.
 - **Energy:** where IFCT energy disagrees with the food's own macronutrients by more than 25 %, energy is recalculated from protein, fat, carbohydrate and fibre. This affects the chicken leg entry, among others.
 
+**More foods:**
+- The everyday list adds cashew (kaju), pista, dried apricot and anjir. IFCT has fresh fig only, so dried anjir is calculated from it at 30 % moisture, with vitamin C left unknown.
+- All 542 IFCT 2017 foods are searchable as reference foods, including by their local names (anjir, kaju, pista, gud). They don't appear on the category shelves.
+
+**Your own recipes:** in "Add a food", choose "Calculate from ingredients":
+- Pick each ingredient and the amount used (g, ml, pieces, cups, bowls or spoons).
+- Optionally give the finished weight and how many pieces it makes.
+- The server recalculates nutrients per 100 g from the ingredients' stored values, ignoring anything the browser sends. Per 100 g = sum(value × grams ÷ 100) ÷ finished weight × 100.
+- A nutrient missing from any ingredient stays unknown. An ingredient with no data at all is refused.
+- The ingredients are linked to the dish, so food-reaction tracking sees them.
+
 **Units:** grams, ml, pieces, cups, bowls and spoons convert to grams through each food's own measures, or through standard household measures where a food has none.
 
 ## Disclaimer

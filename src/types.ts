@@ -80,6 +80,26 @@ export interface FoodEntry {
   sourceNote: string
   ingredients: string[]
   isCustom: boolean
+  /** A raw IFCT 2017 reference food: found by search, not shown on category shelves. */
+  isReference: boolean
+  /** Set for custom foods built from ingredients; the server calculates nutrients from it. */
+  recipe: Recipe | null
+}
+
+export interface RecipeIngredient {
+  foodId: string
+  name: string
+  quantity: number
+  unit: FoodUnit
+  grams: number
+}
+
+export interface Recipe {
+  ingredients: RecipeIngredient[]
+  /** Weight of the finished dish; defaults to the sum of the ingredients. */
+  cookedGrams: number | null
+  /** How many pieces/servings it makes (sets the weight of one piece). */
+  pieces: number | null
 }
 
 export interface MealIngredient {
