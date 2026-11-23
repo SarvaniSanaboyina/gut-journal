@@ -1353,11 +1353,11 @@ input[type='search'] {
 .hist-cell {
   position: relative;
   display: grid;
-  grid-template-rows: auto auto 8px;
+  grid-template-rows: auto auto auto 8px;
   justify-items: center;
   align-content: start;
   gap: 1px;
-  min-height: 62px;
+  min-height: 74px;
   padding: 5px 1px 4px;
   border: 1px solid rgba(58, 45, 82, 0.08);
   border-radius: 10px;
@@ -1473,3 +1473,11 @@ input[type='search'] {
 .recipe-preview dd small { display: block; font-weight: 500; color: var(--ink-soft); font-size: 0.74rem; }
 .food-chip small { margin-left: 4px; font-size: 0.66rem; color: var(--muted); font-weight: 700; }
 @media (max-width: 420px) { .recipe-row-amount { grid-template-columns: 80px 100px; } .recipe-row-amount small { grid-column: 1 / -1; } }
+
+/* Calories in calendar cells */
+.hist-kcal { font-size: 0.68rem; font-weight: 800; color: #1f1a2b; font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1.2; min-height: 0.8rem; }
+.hist-kcal small { font-size: 0.82em; font-weight: 600; margin-left: 1px; }
+@media (max-width: 420px) {
+  .hist-cell { min-height: 64px; }
+  .hist-kcal { font-size: 0.58rem; letter-spacing: -0.02em; }
+}

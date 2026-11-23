@@ -156,3 +156,24 @@ describe('day status', () => {
     assert.equal(DEFAULT_ASSESSMENT.keyNutrients.includes('vitaminDUg'), false)
   })
 })
+
+describe('calendar calories', async () => {
+  const { dayCalories } = await import('../src/nutrition.ts')
+
+  it('sums estimated calories for the day', () => {
+    assert.deepEqual(dayCalories([meal([item('balanced', 500)]), meal([item('ghee', 10)])], FOODS, false), { kcal: 645, partial: false, unknown: false })
+  })
+
+  it('marks a total that leaves out foods without data as partial (≥)', () => {
+    assert.deepEqual(dayCalories([meal([item('balanced', 500), item('mithai', 50)])], FOODS, false), { kcal: 555, partial: true, unknown: false })
+  })
+
+  it('shows nothing for an unrecorded day, and 0 for a day where every meal was skipped', () => {
+    assert.equal(dayCalories([], FOODS, false), null)
+    assert.deepEqual(dayCalories([], FOODS, true), { kcal: 0, partial: false, unknown: false })
+  })
+
+  it('flags food that was logged but could not be estimated at all', () => {
+    assert.deepEqual(dayCalories([meal([item('mithai', 50)])], FOODS, false), { kcal: 0, partial: true, unknown: true })
+  })
+})

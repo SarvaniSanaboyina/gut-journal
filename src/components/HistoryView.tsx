@@ -14,7 +14,7 @@ import {
 import { foodMap } from '../foods'
 import { formatCalories, hasCalories, totalCalories } from '../meals'
 import { buildDayIndex, summariseDay } from '../mealSlots'
-import { NUTRIENTS } from '../nutrition'
+import { dayCalories, NUTRIENTS } from '../nutrition'
 import { assessmentConfig, CALENDAR_LEGEND_ORDER, CALENDAR_META, calendarState, type AssessmentConfig } from '../nutritionAssessment'
 import { parseImportedJournal } from '../storage'
 import type { FoodEntry, JournalData, NutrientKey, NutritionAssessmentSettings, Settings, MealEntry, MoodEntry, PoopEntry, WaterEntry } from '../types'
@@ -110,6 +110,7 @@ function CalendarLegend({ config, onSaveAssessment }: { config: AssessmentConfig
             {CALENDAR_META[state].legend}
           </li>
         ))}
+        <li><span className="cal-legend-ml">815 kcal</span> Calories eaten (estimate; ≥ = some foods not estimated)</li>
         <li><span className="cal-legend-ml">450 ml</span> Water that day (— = none recorded)</li>
         <li><i className="cal-bm-dot" aria-hidden="true" /> Bowel movement recorded</li>
       </ul>
@@ -250,6 +251,7 @@ export function HistoryView({
             const { state } = calendarState(day.completion.status === 'complete', day.records.meals, data.foods, data.settings, iso)
             const meta = CALENDAR_META[state]
             const water = day.waterMl == null ? null : formatTotalMl(day.waterMl).replace(' ', '\u00a0')
+            const calories = future ? null : dayCalories(day.records.meals, data.foods, day.completion.skipped === 5)
             const classes = [
               'hist-cell',
               tracked ? state : 'untracked',
@@ -260,6 +262,11 @@ export function HistoryView({
               formatLongDate(iso),
               tracked ? `nutrition: ${meta.label}` : future ? 'future' : 'before tracking started',
               `meals ${day.completion.eaten} eaten, ${day.completion.skipped} skipped, ${day.completion.notLogged} not logged`,
+              calories == null
+                ? 'no meals recorded'
+                : calories.unknown
+                  ? 'calories not estimated'
+                  : `${calories.partial ? 'at least ' : ''}${Math.round(calories.kcal)} kcal eaten (estimate)`,
               day.waterMl == null ? 'no water recorded' : `water ${formatTotalMl(day.waterMl)}`,
               day.bowelMovements ? `${day.bowelMovements} bowel movement${day.bowelMovements === 1 ? '' : 's'}` : 'no bowel movement recorded',
             ].join(', ')
@@ -278,6 +285,15 @@ export function HistoryView({
                 title={label}
               >
                 <span className="hist-num">{parseISODate(iso).getDate()}</span>
+                <span className="hist-kcal">
+                  {calories == null ? '' : calories.unknown ? '? kcal' : (
+                    <>
+                      {calories.partial ? '≥' : ''}
+                      {Math.round(calories.kcal)}
+                      <small>kcal</small>
+                    </>
+                  )}
+                </span>
                 <span className="hist-ml">{future ? '' : water ?? '–'}</span>
                 <span className="hist-bm">{day.bowelMovements > 0 && <i className="cal-bm-dot" />}</span>
               </button>

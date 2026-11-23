@@ -355,3 +355,17 @@ export function nutritionInsights(data: JournalData, endISO: string): string[] {
   if (varietyBefore) out.push(`${varietyNow} different foods were recorded this week, compared with ${varietyBefore} the week before.`)
   return out
 }
+
+export type DayCalories = { kcal: number; partial: boolean; unknown: boolean }
+
+/**
+ * Estimated calories eaten on a day, for the history calendar. `null` when nothing is recorded,
+ * so an empty day never shows as 0 kcal. A day where every meal was marked not eaten is a
+ * recorded 0. `partial` means some foods could not be estimated (shown as "≥"); `unknown` means
+ * food was logged but none of it could be estimated.
+ */
+export function dayCalories(meals: MealEntry[], foods: FoodEntry[], allSkipped: boolean): DayCalories | null {
+  if (meals.length === 0) return allSkipped ? { kcal: 0, partial: false, unknown: false } : null
+  const total = summarise(meals, foods).totals.energyKcal
+  return { kcal: total.value, partial: total.unknown > 0, unknown: total.unknown > 0 && total.value === 0 }
+}
