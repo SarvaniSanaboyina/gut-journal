@@ -17,7 +17,7 @@ import { buildDayIndex, summariseDay } from '../mealSlots'
 import { NUTRIENTS } from '../nutrition'
 import { assessmentConfig, CALENDAR_LEGEND_ORDER, CALENDAR_META, calendarState, type AssessmentConfig } from '../nutritionAssessment'
 import { parseImportedJournal } from '../storage'
-import type { JournalData, NutrientKey, NutritionAssessmentSettings, MealEntry, MoodEntry, PoopEntry, WaterEntry } from '../types'
+import type { FoodEntry, JournalData, NutrientKey, NutritionAssessmentSettings, Settings, MealEntry, MoodEntry, PoopEntry, WaterEntry } from '../types'
 import { formatTotalMl, formatWater, totalWaterMl } from '../water'
 import { Chevron, MoodFace, StoolArt, WaterDrop } from './Icons'
 import { MealCard } from './MealCard'
@@ -299,7 +299,7 @@ export function HistoryView({
         {empty ? (
           <div className="empty">Tap a date with a dot, or modify this day to add entries.</div>
         ) : (
-          <DayEntries meals={meals} poops={poops} moods={moods} waters={waters} note={note} />
+          <DayEntries meals={meals} poops={poops} moods={moods} waters={waters} note={note} nutrients={{ foods: data.foods, settings: data.settings }} />
         )}
       </section>
     </>
@@ -338,12 +338,14 @@ function DayEntries({
   moods,
   waters,
   note,
+  nutrients,
 }: {
   meals: MealEntry[]
   poops: PoopEntry[]
   moods: MoodEntry[]
   waters: WaterEntry[]
   note?: string
+  nutrients: { foods: FoodEntry[]; settings: Settings }
 }) {
   const mealList = byTime(meals)
   const waterList = byTime(waters)
@@ -360,7 +362,7 @@ function DayEntries({
         >
           <div className="entry-list">
             {mealList.map((entry) => (
-              <MealCard key={entry.id} entry={entry} />
+              <MealCard key={entry.id} entry={entry} nutrients={nutrients} />
             ))}
           </div>
           {caloriesLogged && (

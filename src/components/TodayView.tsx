@@ -96,7 +96,7 @@ export function TodayView({
 
       <CareNotices notices={notices} />
 
-      <MealSchedule summary={daySummary} onLog={onLogSlot} onEditMeal={onEditMeal} onSkip={onSkipSlot} onClearSkip={onClearSlot} />
+      <MealSchedule summary={daySummary} foods={data.foods} settings={data.settings} onLog={onLogSlot} onEditMeal={onEditMeal} onSkip={onSkipSlot} onClearSkip={onClearSlot} />
 
       <div className="summary">
         <div className="summary-card">
@@ -135,7 +135,7 @@ export function TodayView({
           <>
             <div className="entry-list">
               {meals.map((entry) => (
-                <MealCard key={entry.id} entry={entry} onSelect={() => onEditMeal(entry)} />
+                <MealCard key={entry.id} entry={entry} onSelect={() => onEditMeal(entry)} nutrients={{ foods: data.foods, settings: data.settings }} />
               ))}
             </div>
             {caloriesLogged && (

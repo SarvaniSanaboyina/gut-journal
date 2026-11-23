@@ -8,7 +8,8 @@ import {
   mealDurationMinutes,
 } from '../meals'
 import { consumedPercent, consumptionLabel, formatAmount } from '../foods'
-import type { MealEntry, MealItem } from '../types'
+import type { FoodEntry, MealEntry, MealItem, Settings } from '../types'
+import { MealNutrientsButton } from './MealNutrients'
 import { MealPhotoStrip } from './MealPhotos'
 
 function itemLine(item: MealItem) {
@@ -24,9 +25,12 @@ function itemLine(item: MealItem) {
 export function MealCard({
   entry,
   onSelect,
+  nutrients,
 }: {
   entry: MealEntry
   onSelect?: () => void
+  /** When given, shows a Nutrients button for this meal. */
+  nutrients?: { foods: FoodEntry[]; settings: Settings }
 }) {
   const duration = mealDurationMinutes(entry)
   const hasItems = entry.items.length > 0
@@ -97,6 +101,11 @@ export function MealCard({
         </button>
       ) : (
         <div className="entry-body meal-body">{body}</div>
+      )}
+      {nutrients && entry.items.length > 0 && (
+        <div className="meal-card-actions">
+          <MealNutrientsButton meal={entry} foods={nutrients.foods} settings={nutrients.settings} />
+        </div>
       )}
       <MealPhotoStrip
         mealId={entry.id}

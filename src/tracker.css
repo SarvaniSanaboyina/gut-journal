@@ -1446,3 +1446,13 @@ input[type='search'] {
 @media (max-width: 420px) { .nutrient-assessment { font-size: 0.74rem; } .nutrient-assessment th, .nutrient-assessment td { padding: 6px 4px; } }
 .cal-legend-toggle { display: block; margin: 0 0 8px auto; font-size: 0.8rem; }
 .cal-legend .cal-legend-toggle { margin-top: -2px; }
+
+/* Per-meal nutrients */
+.slot-meal-actions { display: inline-flex; gap: 6px; }
+.meal-card-actions { display: flex; justify-content: flex-end; padding: 0 12px 10px; }
+.meal-nutrients { display: grid; gap: 10px; }
+.meal-nutrient-foods ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.meal-nutrient-foods li { display: grid; gap: 1px; font-size: 0.88rem; }
+.meal-nutrient-foods li small { color: var(--muted); font-size: 0.76rem; }
+.meal-nutrient-foods li.refused .food-name { text-decoration: line-through; color: var(--muted); }
+.meal-nutrient-foods li.missing small { color: #8a5a00; }

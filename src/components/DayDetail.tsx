@@ -90,7 +90,7 @@ export function DayDetail({
         }
       />
 
-      <MealSchedule summary={summary} title="Meals" showSummary={false} onLog={onLogSlot} onEditMeal={onEditMeal} onSkip={onSkipSlot} onClearSkip={onClearSlot} />
+      <MealSchedule summary={summary} title="Meals" showSummary={false} foods={data.foods} settings={data.settings} onLog={onLogSlot} onEditMeal={onEditMeal} onSkip={onSkipSlot} onClearSkip={onClearSlot} />
 
       {others.length > 0 && (
         <section className="section">

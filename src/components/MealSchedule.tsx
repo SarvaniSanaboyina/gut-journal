@@ -1,7 +1,8 @@
 import { consumedPercent, formatAmount } from '../foods'
 import { formatTime } from '../dates'
 import { COMPLETION_LABEL, type DaySummary, type SlotState } from '../mealSlots'
-import type { MealEntry, SlotType } from '../types'
+import type { FoodEntry, MealEntry, Settings, SlotType } from '../types'
+import { MealNutrientsButton } from './MealNutrients'
 
 function SlotFoods({ slot }: { slot: SlotState }) {
   return (
@@ -47,6 +48,8 @@ export function MealSchedule({
   onClearSkip,
   title = 'Meal schedule',
   showSummary = true,
+  foods,
+  settings,
 }: {
   summary: DaySummary
   onLog: (type: SlotType) => void
@@ -56,6 +59,9 @@ export function MealSchedule({
   title?: string
   /** Hide the completion badge and counts when the surrounding view already shows them. */
   showSummary?: boolean
+  /** Food list and settings, for each meal's Nutrients button. */
+  foods: FoodEntry[]
+  settings: Settings
 }) {
   const { completion, slots } = summary
   return (
@@ -102,9 +108,12 @@ export function MealSchedule({
                 {slot.status === 'eaten' && (
                   <>
                     {slot.meals.map((meal, index) => (
-                      <button key={meal.id} type="button" className="slot-btn" onClick={() => onEditMeal(meal)}>
-                        Edit{slot.meals.length > 1 ? ` ${index + 1}` : ''}
-                      </button>
+                      <span key={meal.id} className="slot-meal-actions">
+                        <button type="button" className="slot-btn" onClick={() => onEditMeal(meal)}>
+                          Edit{slot.meals.length > 1 ? ` ${index + 1}` : ''}
+                        </button>
+                        <MealNutrientsButton meal={meal} foods={foods} settings={settings} className="slot-btn primary-soft" />
+                      </span>
                     ))}
                     <button type="button" className="slot-btn" onClick={() => onLog(slot.slot.id)}>+ Add</button>
                     <button type="button" className="slot-btn" onClick={() => onSkip(slot.slot.id)}>Not eaten</button>
