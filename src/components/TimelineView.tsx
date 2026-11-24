@@ -3,12 +3,14 @@ import { dateRange, formatLongDate, formatTime, shiftDate, todayISO } from '../d
 import { consumedPercent, consumptionLabel, eatenFoods } from '../foods'
 import { bristolGroupMeta, bristolGroup, formatGap, stamp, SYMPTOMS, symptomIcon, symptomLabel } from '../gut'
 import { mealLabel as mealTypeLabel } from '../constants'
-import type { JournalData, MealEntry, PoopEntry, SymptomEntry, SymptomType } from '../types'
+import type { JournalData, MealEntry, PoopEntry, SymptomEntry, SymptomType, WaterEntry } from '../types'
+import { formatTotalMl, formatWater, totalWaterMl } from '../water'
 
 type Event =
   | { kind: 'meal'; at: number; date: string; time: string; meal: MealEntry; match: boolean }
   | { kind: 'poop'; at: number; date: string; time: string; poop: PoopEntry; after: number | null }
   | { kind: 'symptom'; at: number; date: string; time: string; symptom: SymptomEntry; after: number | null }
+  | { kind: 'water'; at: number; date: string; time: string; water: WaterEntry }
 
 const WINDOW_HOURS = [6, 12, 24, 48] as const
 
@@ -24,11 +26,13 @@ export function TimelineView({
   onEditMeal,
   onEditPoop,
   onEditSymptom,
+  onEditWater,
 }: {
   data: JournalData
   onEditMeal: (entry: MealEntry) => void
   onEditPoop: (entry: PoopEntry) => void
   onEditSymptom: (entry: SymptomEntry) => void
+  onEditWater: (entry: WaterEntry) => void
 }) {
   const today = todayISO()
   const [end, setEnd] = useState(today)
@@ -36,7 +40,7 @@ export function TimelineView({
   const [query, setQuery] = useState('')
   const [symptomFilter, setSymptomFilter] = useState<SymptomType | 'all' | 'none'>('all')
   const [windowHours, setWindowHours] = useState<(typeof WINDOW_HOURS)[number]>(24)
-  const [show, setShow] = useState({ meals: true, poops: true, symptoms: true })
+  const [show, setShow] = useState({ meals: true, water: true, poops: true, symptoms: true })
   const days = useMemo(() => dateRange(shiftDate(end, -(length - 1)), end), [end, length])
   const trimmed = query.trim()
 
@@ -54,6 +58,11 @@ export function TimelineView({
     if (show.meals) {
       for (const meal of meals.filter((item) => set.has(item.date))) {
         events.push({ kind: 'meal', at: stamp(meal.date, meal.time), date: meal.date, time: meal.time, meal, match: mealMatches(meal, trimmed) })
+      }
+    }
+    if (show.water) {
+      for (const water of data.waters.filter((item) => set.has(item.date))) {
+        events.push({ kind: 'water', at: stamp(water.date, water.time), date: water.date, time: water.time, water })
       }
     }
     if (show.poops) {
@@ -74,8 +83,18 @@ export function TimelineView({
     return grouped
   }, [data, days, end, show, symptomFilter, trimmed, windowHours])
 
+  // Daily water totals for the day headings (shown even when water rows are hidden).
+  const waterByDay = useMemo(() => {
+    const totals = new Map<string, number>()
+    for (const day of days) {
+      const entries = data.waters.filter((item) => item.date === day)
+      if (entries.length) totals.set(day, totalWaterMl(entries))
+    }
+    return totals
+  }, [data.waters, days])
+
   const matchedMeals = [...byDay.values()].flat().filter((event) => event.kind === 'meal' && event.match).length
-  const gutAfter = [...byDay.values()].flat().filter((event) => event.kind !== 'meal' && event.after != null).length
+  const gutAfter = [...byDay.values()].flat().filter((event) => (event.kind === 'poop' || event.kind === 'symptom') && event.after != null).length
 
   return (
     <>
@@ -118,6 +137,7 @@ export function TimelineView({
         {([
           ['meals', '🍽 Meals'],
           ['poops', '🚽 Bowel movements'],
+          ['water', '💧 Water'],
           ['symptoms', '🩹 Symptoms'],
         ] as const).map(([key, label]) => (
           <button key={key} type="button" aria-pressed={show[key]} className={`choice ${show[key] ? 'selected' : ''}`} onClick={() => setShow({ ...show, [key]: !show[key] })}>
@@ -136,7 +156,10 @@ export function TimelineView({
       <div className="timeline">
         {[...byDay.entries()].map(([day, events]) => (
           <section key={day} className="timeline-day">
-            <h4>{formatLongDate(day)}</h4>
+            <h4>
+              {formatLongDate(day)}
+              {waterByDay.has(day) && <span className="tl-day-water"> · 💧 {formatTotalMl(waterByDay.get(day)!)} water</span>}
+            </h4>
             {events.length === 0 ? (
               <p className="muted-note timeline-empty">Nothing logged</p>
             ) : (
@@ -163,6 +186,20 @@ export function TimelineView({
                                 </span>
                               ))}
                             </span>
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  }
+                  if (event.kind === 'water') {
+                    return (
+                      <li key={event.water.id} className="tl-event water">
+                        <button type="button" onClick={() => onEditWater(event.water)}>
+                          <time>{formatTime(event.time)}</time>
+                          <span className="tl-lane">Water</span>
+                          <span className="tl-body">
+                            <strong>Water · {formatWater(event.water.amount, event.water.unit)}</strong>
+                            {event.water.notes && <small>{event.water.notes}</small>}
                           </span>
                         </button>
                       </li>

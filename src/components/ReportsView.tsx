@@ -20,7 +20,7 @@ import { SLOTS } from '../mealSlots'
 import { buildPeriodReport } from '../meals'
 import { comparisonSections, previousRange, reportHighlights, summarisePeriod, type CompareRow, type ReportRange } from '../reports'
 import { DISCLAIMER } from '../safety'
-import type { ChildProfile, GrowthEntry, JournalData, MealEntry, PoopEntry, SymptomEntry } from '../types'
+import type { ChildProfile, GrowthEntry, JournalData, MealEntry, PoopEntry, SymptomEntry, WaterEntry } from '../types'
 import { BarList, ColumnChart } from './Charts'
 import { Chevron } from './Icons'
 import { TimelineView } from './TimelineView'
@@ -298,6 +298,7 @@ export function ReportsView({
   onEditMeal,
   onEditPoop,
   onEditSymptom,
+  onEditWater,
   onSaveGrowth,
   onDeleteGrowth,
   onSaveProfile,
@@ -309,6 +310,7 @@ export function ReportsView({
   onEditMeal: (entry: MealEntry) => void
   onEditPoop: (entry: PoopEntry) => void
   onEditSymptom: (entry: SymptomEntry) => void
+  onEditWater: (entry: WaterEntry) => void
   onSaveGrowth: (entry: GrowthEntry) => Promise<void>
   onDeleteGrowth: (id: string) => Promise<void>
   onSaveProfile: (profile: ChildProfile) => Promise<void>
@@ -340,7 +342,7 @@ export function ReportsView({
       </div>
 
       {tab === 'summary' && <Summary data={data} date={date} onChangeDate={onChangeDate} />}
-      {tab === 'timeline' && <TimelineView data={data} onEditMeal={onEditMeal} onEditPoop={onEditPoop} onEditSymptom={onEditSymptom} />}
+      {tab === 'timeline' && <TimelineView data={data} onEditMeal={onEditMeal} onEditPoop={onEditPoop} onEditSymptom={onEditSymptom} onEditWater={onEditWater} />}
       {tab === 'growth' && (
         <Suspense fallback={<div className="empty">Loading growth charts…</div>}>
           <GrowthView data={data} onSave={onSaveGrowth} onDelete={onDeleteGrowth} onSaveProfile={onSaveProfile} />

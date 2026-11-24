@@ -1482,3 +1482,5 @@ input[type='search'] {
   .hist-kcal { font-size: 0.58rem; letter-spacing: -0.02em; }
 }
 .schedule-toggle { display: block; margin: 0 0 4px; font-size: 0.86rem; }
+.tl-event.water button::before { background: #2a78d6; }
+.tl-day-water { font-weight: 600; color: var(--muted); }

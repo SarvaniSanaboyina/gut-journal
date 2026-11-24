@@ -18,6 +18,8 @@ export function WaterForm({
   onDelete?: () => void
   onCancel: () => void
 }) {
+  // Editing keeps the entry's own day (it may be opened from another day, e.g. the timeline).
+  const day = initial?.date ?? date
   const [time, setTime] = useState(initial?.time ?? nowTime())
   const [amount, setAmount] = useState(initial?.amount != null ? String(initial.amount) : '')
   const [unit, setUnit] = useState<WaterUnit>(initial?.unit ?? 'ml')
@@ -25,7 +27,7 @@ export function WaterForm({
   const parsed = Number(amount)
   // 0 is valid: it records that no water was drunk, which the calendar shows as 0 ml rather than a dash.
   const valid = amount.trim() !== '' && Number.isFinite(parsed) && parsed >= 0
-  const alreadyMl = totalWaterMl(logged.filter((item) => item.id !== initial?.id && item.date === date))
+  const alreadyMl = totalWaterMl(logged.filter((item) => item.id !== initial?.id && item.date === day))
   const thisMl = valid ? waterMl({ amount: parsed, unit }) : 0
   const totalMl = alreadyMl + thisMl
 
@@ -37,7 +39,7 @@ export function WaterForm({
         if (!valid) return
         onSave({
           id: initial?.id ?? crypto.randomUUID(),
-          date,
+          date: day,
           time,
           amount: parsed,
           unit,

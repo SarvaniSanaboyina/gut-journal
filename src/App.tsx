@@ -128,7 +128,7 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
         </div>
         <AccountMenu
           items={[
-            { label: 'History & backup', onSelect: () => setView('history') },
+            { label: 'Gut health', onSelect: () => setView('gut') },
             { label: 'Your data: export & delete', onSelect: () => setDataOpen(true) },
             { label: 'Food list', onSelect: () => setFoodsOpen(true) },
           ]}
@@ -241,6 +241,7 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
           onEditMeal={(entry) => setEditor({ kind: 'meal', entry })}
           onEditPoop={(entry) => setEditor({ kind: 'poop', entry })}
           onEditSymptom={(entry) => setEditor({ kind: 'symptom', entry })}
+          onEditWater={(entry) => setEditor({ kind: 'water', entry })}
           onSaveGrowth={journal.upsertGrowth}
           onDeleteGrowth={journal.removeGrowth}
           onSaveProfile={journal.saveChildProfile}
@@ -268,8 +269,8 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
         <button className={view === 'today' ? 'active' : ''} onClick={() => setView('today')}>
           Diary
         </button>
-        <button className={view === 'gut' ? 'active' : ''} onClick={() => setView('gut')}>
-          Gut
+        <button className={view === 'history' ? 'active' : ''} onClick={() => setView('history')}>
+          History
         </button>
         <button className={view === 'nutrition' ? 'active' : ''} onClick={() => setView('nutrition')}>
           Nutrition
@@ -361,7 +362,7 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
           <WaterForm
             date={date}
             initial={editor.entry}
-            logged={(journal.data.waters ?? []).filter((item) => item.date === date)}
+            logged={journal.data.waters ?? []}
             onSave={(entry) => persist(() => journal.upsertWater(entry), () => setEditor(null))}
             onDelete={
               editor.entry
