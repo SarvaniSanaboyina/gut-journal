@@ -96,7 +96,7 @@ export function TodayView({
 
       <CareNotices notices={notices} />
 
-      <MealSchedule summary={daySummary} foods={data.foods} settings={data.settings} onLog={onLogSlot} onEditMeal={onEditMeal} onSkip={onSkipSlot} onClearSkip={onClearSlot} />
+      <MealSchedule collapsible summary={daySummary} foods={data.foods} settings={data.settings} onLog={onLogSlot} onEditMeal={onEditMeal} onSkip={onSkipSlot} onClearSkip={onClearSlot} />
 
       <div className="summary">
         <div className="summary-card">

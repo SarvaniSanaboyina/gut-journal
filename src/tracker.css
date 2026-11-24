@@ -1481,3 +1481,4 @@ input[type='search'] {
   .hist-cell { min-height: 64px; }
   .hist-kcal { font-size: 0.58rem; letter-spacing: -0.02em; }
 }
+.schedule-toggle { display: block; margin: 0 0 4px; font-size: 0.86rem; }

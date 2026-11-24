@@ -1,8 +1,19 @@
+import { useState } from 'react'
 import { consumedPercent, formatAmount } from '../foods'
 import { formatTime } from '../dates'
 import { COMPLETION_LABEL, type DaySummary, type SlotState } from '../mealSlots'
 import type { FoodEntry, MealEntry, Settings, SlotType } from '../types'
 import { MealNutrientsButton } from './MealNutrients'
+
+const OPEN_KEY = 'diary-meal-schedule-open'
+
+function readOpen() {
+  try {
+    return localStorage.getItem(OPEN_KEY) === '1'
+  } catch {
+    return false
+  }
+}
 
 function SlotFoods({ slot }: { slot: SlotState }) {
   return (
@@ -50,6 +61,7 @@ export function MealSchedule({
   showSummary = true,
   foods,
   settings,
+  collapsible = false,
 }: {
   summary: DaySummary
   onLog: (type: SlotType) => void
@@ -62,8 +74,19 @@ export function MealSchedule({
   /** Food list and settings, for each meal's Nutrients button. */
   foods: FoodEntry[]
   settings: Settings
+  /** Start collapsed to the summary line, with a toggle; the choice is remembered on this device. */
+  collapsible?: boolean
 }) {
   const { completion, slots } = summary
+  const [open, setOpenState] = useState(() => !collapsible || readOpen())
+  const setOpen = (value: boolean) => {
+    setOpenState(value)
+    try {
+      localStorage.setItem(OPEN_KEY, value ? '1' : '0')
+    } catch {
+      // Storage can be unavailable (private mode); the toggle still works for this visit.
+    }
+  }
   return (
     <section className="section meal-schedule">
       <div className="section-head">
@@ -81,7 +104,13 @@ export function MealSchedule({
         <span><strong>{completion.skipped}</strong>/5 skipped</span>
         <span><strong>{completion.notLogged}</strong>/5 not logged</span>
       </div>}
-      <ol className="slot-list">
+      {collapsible && (
+        <button type="button" className="link-btn schedule-toggle" aria-expanded={open} aria-controls="meal-schedule-slots" onClick={() => setOpen(!open)}>
+          {open ? 'Hide meals ▴' : 'Show meals ▾'}
+        </button>
+      )}
+      {open && (<>
+      <ol className="slot-list" id="meal-schedule-slots">
         {slots.map((slot) => {
           const firstMeal = slot.meals[0]
           return (
@@ -131,6 +160,7 @@ export function MealSchedule({
         })}
       </ol>
       <p className="muted-note slot-disclaimer">“Complete” means every meal was recorded — not that the day’s diet was balanced.</p>
+      </>)}
     </section>
   )
 }
