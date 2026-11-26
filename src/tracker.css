@@ -1484,3 +1484,16 @@ input[type='search'] {
 .schedule-toggle { display: block; margin: 0 0 4px; font-size: 0.86rem; }
 .tl-event.water button::before { background: #2a78d6; }
 .tl-day-water { font-weight: 600; color: var(--muted); }
+
+/* Calorie calculator */
+.calc-close { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 8px 16px; font-weight: 650; color: var(--ink); }
+.calc-food { display: grid; gap: 8px; background: var(--wash); border-radius: 14px; padding: 10px 12px; }
+.calc-headlines { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.calc-headline { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; display: grid; gap: 2px; }
+.calc-headline span { font-size: 0.74rem; color: var(--muted); font-weight: 650; }
+.calc-headline strong { font-family: var(--font-display); font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.calc-save { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 12px; }
+.calc-save .muted-note { margin: 0; }
+.calc-save .recipe-row-amount { grid-template-columns: minmax(0, 1fr) auto; }
+.calc-save button.primary { border: 0; border-radius: 12px; padding: 10px 18px; font-weight: 700; }
+.food-chip.selected { border-color: var(--sage); background: var(--wash); }

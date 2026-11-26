@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from './auth'
 import { AccountMenu } from './components/AccountMenu'
+import { CalorieCalculator } from './components/CalorieCalculator'
 import { DataPanel } from './components/DataPanel'
 import { DayDetail } from './components/DayDetail'
 import { AuthScreen } from './components/AuthScreen'
@@ -24,7 +25,7 @@ import { formatLongDate, isToday, shiftDate, todayISO } from './dates'
 import { useJournal } from './storage'
 import type { MealEntry, MoodEntry, PoopEntry, SlotType, SymptomEntry, WaterEntry } from './types'
 
-type View = 'today' | 'gut' | 'nutrition' | 'reports' | 'history'
+type View = 'today' | 'gut' | 'nutrition' | 'reports' | 'history' | 'calculator'
 type Editor =
   | { kind: 'meal'; entry?: MealEntry; type?: SlotType }
   | { kind: 'poop'; entry?: PoopEntry }
@@ -130,6 +131,7 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
           items={[
             { label: 'Gut health', onSelect: () => setView('gut') },
             { label: 'Your data: export & delete', onSelect: () => setDataOpen(true) },
+            { label: 'Calorie calculator', onSelect: () => setView('calculator') },
             { label: 'Food list', onSelect: () => setFoodsOpen(true) },
           ]}
           onChangeBirthDate={() => setBirthDateOpen(true)}
@@ -245,6 +247,15 @@ function JournalApp({ userName, onSignOut }: { userName: string; onSignOut: () =
           onSaveGrowth={journal.upsertGrowth}
           onDeleteGrowth={journal.removeGrowth}
           onSaveProfile={journal.saveChildProfile}
+        />
+      )}
+
+      {journal.status === 'ready' && view === 'calculator' && (
+        <CalorieCalculator
+          foods={journal.data.foods}
+          settings={journal.data.settings}
+          onSaveFood={journal.upsertFood}
+          onClose={() => setView('today')}
         />
       )}
 
