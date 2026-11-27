@@ -197,6 +197,9 @@ async function migrateBrowserJournal(remote: JournalData): Promise<JournalData> 
   return imported
 }
 
+/** Focus and visibility events often fire together; refetch at most this often. */
+const REFRESH_MIN_INTERVAL_MS = 10_000
+
 export function useJournal() {
   const [data, setData] = useState<JournalData>(() => emptyJournal())
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -206,8 +209,21 @@ export function useJournal() {
   const notesRef = useRef<Record<string, string>>({})
   const noteTimers = useRef(new Map<string, number>())
   const noteChain = useRef(new Map<string, Promise<void>>())
+  /** Day notes whose save request is still in flight. */
+  const notesSaving = useRef(new Set<string>())
+  /** Bumped on every local change, so a background refresh that started earlier is discarded. */
+  const localVersion = useRef(0)
+  const lastFetched = useRef(0)
+  const refreshing = useRef(false)
+
+  const update = useCallback((change: (prev: JournalData) => JournalData) => {
+    localVersion.current += 1
+    setData(change)
+  }, [])
 
   const remember = useCallback((next: JournalData) => {
+    // Replacing the journal (load, import, delete-all, refresh) also invalidates older refreshes.
+    localVersion.current += 1
     notesRef.current = next.dayNotes
     setData({ ...next, waters: next.waters ?? [], symptoms: next.symptoms ?? [], dailyMetrics: next.dailyMetrics ?? [], growth: next.growth ?? [], mealSlots: next.mealSlots ?? [], settings: { ...emptyJournal().settings, ...next.settings } })
   }, [])
@@ -222,6 +238,7 @@ export function useJournal() {
         const next = await migrateBrowserJournal(remote)
         if (cancelled) return
         remember(next)
+        lastFetched.current = Date.now()
         setStatus('ready')
       } catch (loadError) {
         if (cancelled) return
@@ -237,6 +254,7 @@ export function useJournal() {
   const persistNote = useCallback((date: string) => {
     const note = notesRef.current[date] ?? ''
     const previous = noteChain.current.get(date) ?? Promise.resolve()
+    notesSaving.current.add(date)
     const next = previous
       .catch(() => undefined)
       .then(async () => {
@@ -246,73 +264,117 @@ export function useJournal() {
       .catch((saveFailure: unknown) => {
         setSaveError(saveFailure instanceof Error ? saveFailure.message : 'Could not save the day note')
       })
+      .finally(() => {
+        if (noteChain.current.get(date) === next) notesSaving.current.delete(date)
+      })
     noteChain.current.set(date, next)
   }, [])
 
+  /**
+   * Fetch the latest journal in the background (e.g. after the app regains focus) so entries made
+   * on another device appear. The screen is not cleared while it loads. Day notes still being typed
+   * or saved here are kept, and a result is discarded if anything changed locally meanwhile.
+   */
+  const refresh = useCallback(async () => {
+    if (refreshing.current || document.visibilityState !== 'visible') return
+    if (Date.now() - lastFetched.current < REFRESH_MIN_INTERVAL_MS) return
+    refreshing.current = true
+    const version = localVersion.current
+    try {
+      const remote = await getJournal()
+      lastFetched.current = Date.now()
+      if (version !== localVersion.current) return
+      const dayNotes = { ...remote.dayNotes }
+      for (const date of new Set([...noteTimers.current.keys(), ...notesSaving.current])) {
+        dayNotes[date] = notesRef.current[date] ?? ''
+      }
+      remember({ ...remote, dayNotes })
+    } catch {
+      // Offline or a server hiccup: keep what is on screen and try again next time.
+      // A signed-out session is handled by the app-wide unauthorized event.
+    } finally {
+      refreshing.current = false
+    }
+  }, [remember])
+
+  useEffect(() => {
+    if (status !== 'ready') return
+    const onFocus = () => void refresh()
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void refresh()
+    }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [status, refresh])
+
   const upsertMeal = useCallback(async (entry: MealEntry) => {
     const saved = await saveMeal(entry)
-    setData((prev) => ({
+    update((prev) => ({
       ...prev,
       meals: [...prev.meals.filter((item) => item.id !== saved.id), saved],
       // The server clears a "not eaten" mark when food is logged for that slot.
       mealSlots: prev.mealSlots.filter((item) => !(item.date === saved.date && item.mealType === saved.type)),
     }))
-  }, [])
+  }, [update])
 
   const upsertPoop = useCallback(async (entry: PoopEntry) => {
     const saved = await savePoop(entry)
-    setData((prev) => ({
+    update((prev) => ({
       ...prev,
       poops: [...prev.poops.filter((item) => item.id !== saved.id), saved],
     }))
-  }, [])
+  }, [update])
 
   const upsertMood = useCallback(async (entry: MoodEntry) => {
     const saved = await saveMood(entry)
-    setData((prev) => ({
+    update((prev) => ({
       ...prev,
       moods: [...prev.moods.filter((item) => item.id !== saved.id), saved],
     }))
-  }, [])
+  }, [update])
 
   const upsertWater = useCallback(async (entry: WaterEntry) => {
     const saved = await saveWater(entry)
-    setData((prev) => ({
+    update((prev) => ({
       ...prev,
       waters: [...(prev.waters ?? []).filter((item) => item.id !== saved.id), saved],
     }))
-  }, [])
+  }, [update])
 
   const upsertSymptom = useCallback(async (entry: SymptomEntry) => {
     const saved = await saveSymptom(entry)
-    setData((prev) => ({
+    update((prev) => ({
       ...prev,
       symptoms: [...prev.symptoms.filter((item) => item.id !== saved.id), saved],
     }))
-  }, [])
+  }, [update])
 
   const removeSymptom = useCallback(async (id: string) => {
     await deleteSymptom(id)
-    setData((prev) => ({ ...prev, symptoms: prev.symptoms.filter((item) => item.id !== id) }))
-  }, [])
+    update((prev) => ({ ...prev, symptoms: prev.symptoms.filter((item) => item.id !== id) }))
+  }, [update])
 
   const saveDailyMetric = useCallback(async (entry: DailyMetricEntry) => {
     const saved = await putDailyMetric(entry)
-    setData((prev) => ({
+    update((prev) => ({
       ...prev,
       dailyMetrics: [...prev.dailyMetrics.filter((item) => item.date !== saved.date), saved],
     }))
-  }, [])
+  }, [update])
 
   const upsertGrowth = useCallback(async (entry: GrowthEntry) => {
     const saved = await saveGrowth(entry)
-    setData((prev) => ({ ...prev, growth: [...prev.growth.filter((item) => item.id !== saved.id), saved] }))
-  }, [])
+    update((prev) => ({ ...prev, growth: [...prev.growth.filter((item) => item.id !== saved.id), saved] }))
+  }, [update])
 
   const removeGrowth = useCallback(async (id: string) => {
     await deleteGrowth(id)
-    setData((prev) => ({ ...prev, growth: prev.growth.filter((item) => item.id !== id) }))
-  }, [])
+    update((prev) => ({ ...prev, growth: prev.growth.filter((item) => item.id !== id) }))
+  }, [update])
 
   const deleteEverything = useCallback(async () => {
     for (const timer of noteTimers.current.values()) window.clearTimeout(timer)
@@ -325,7 +387,7 @@ export function useJournal() {
   /** Mark a scheduled slot "not eaten" (optionally replacing logged food) or clear that mark. */
   const setMealSlot = useCallback(async (date: string, mealType: SlotType, change: SlotChange) => {
     const saved = await putMealSlot(date, mealType, change)
-    setData((prev) => {
+    update((prev) => {
       const rest = prev.mealSlots.filter((item) => !(item.date === date && item.mealType === mealType))
       return {
         ...prev,
@@ -334,35 +396,35 @@ export function useJournal() {
       }
     })
     if (saved.removedMeals.length) notifyPhotosChanged()
-  }, [])
+  }, [update])
 
   const saveAssessment = useCallback(async (value: NutritionAssessmentSettings) => {
     const saved = await putSetting('nutrition-assessment', value)
-    setData((prev) => ({ ...prev, settings: { ...prev.settings, nutritionAssessment: saved } }))
-  }, [])
+    update((prev) => ({ ...prev, settings: { ...prev.settings, nutritionAssessment: saved } }))
+  }, [update])
 
   const saveChildProfile = useCallback(async (profile: ChildProfile) => {
     const saved = await putSetting('child-profile', profile)
-    setData((prev) => ({ ...prev, settings: { ...prev.settings, childProfile: saved } }))
-  }, [])
+    update((prev) => ({ ...prev, settings: { ...prev.settings, childProfile: saved } }))
+  }, [update])
 
   const saveReferences = useCallback(async (references: Settings['nutrientReferences']) => {
     const saved = await putSetting('nutrient-references', references)
-    setData((prev) => ({ ...prev, settings: { ...prev.settings, nutrientReferences: saved } }))
-  }, [])
+    update((prev) => ({ ...prev, settings: { ...prev.settings, nutrientReferences: saved } }))
+  }, [update])
 
   const upsertFood = useCallback(async (entry: FoodEntry) => {
     const saved = await saveFood(entry)
-    setData((prev) => ({
+    update((prev) => ({
       ...prev,
       foods: [...prev.foods.filter((item) => item.id !== saved.id), saved],
     }))
     return saved
-  }, [])
+  }, [update])
 
   const removeFood = useCallback(async (id: string) => {
     await deleteFood(id)
-    setData((prev) => ({
+    update((prev) => ({
       ...prev,
       foods: prev.foods.filter((item) => item.id !== id),
       // The server clears the food link on past meals and keeps the name.
@@ -375,32 +437,32 @@ export function useJournal() {
         })),
       })),
     }))
-  }, [])
+  }, [update])
 
   const removeMeal = useCallback(async (id: string) => {
     await deleteMeal(id)
-    setData((prev) => ({ ...prev, meals: prev.meals.filter((item) => item.id !== id) }))
+    update((prev) => ({ ...prev, meals: prev.meals.filter((item) => item.id !== id) }))
     notifyPhotosChanged()
-  }, [])
+  }, [update])
 
   const removePoop = useCallback(async (id: string) => {
     await deletePoop(id)
-    setData((prev) => ({ ...prev, poops: prev.poops.filter((item) => item.id !== id) }))
-  }, [])
+    update((prev) => ({ ...prev, poops: prev.poops.filter((item) => item.id !== id) }))
+  }, [update])
 
   const removeMood = useCallback(async (id: string) => {
     await deleteMood(id)
-    setData((prev) => ({ ...prev, moods: prev.moods.filter((item) => item.id !== id) }))
-  }, [])
+    update((prev) => ({ ...prev, moods: prev.moods.filter((item) => item.id !== id) }))
+  }, [update])
 
   const removeWater = useCallback(async (id: string) => {
     await deleteWater(id)
-    setData((prev) => ({ ...prev, waters: (prev.waters ?? []).filter((item) => item.id !== id) }))
-  }, [])
+    update((prev) => ({ ...prev, waters: (prev.waters ?? []).filter((item) => item.id !== id) }))
+  }, [update])
 
   const setDayNote = useCallback((date: string, note: string) => {
     notesRef.current = { ...notesRef.current, [date]: note }
-    setData((prev) => ({
+    update((prev) => ({
       ...prev,
       dayNotes: { ...prev.dayNotes, [date]: note },
     }))
@@ -413,7 +475,7 @@ export function useJournal() {
         persistNote(date)
       }, 300),
     )
-  }, [persistNote])
+  }, [persistNote, update])
 
   const flushDayNote = useCallback((date: string) => {
     const existing = noteTimers.current.get(date)
